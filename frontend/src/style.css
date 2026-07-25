@@ -579,6 +579,27 @@ p {
   background: #ffffff;
 }
 
+.task-guide {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.task-guide strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.task-guide span,
+.task-guide small {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .deploy-preview strong {
   color: #0f172a;
   font-size: 13px;

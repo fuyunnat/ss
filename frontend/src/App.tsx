@@ -60,6 +60,8 @@ const protocolPresets = [
   { protocol: 'shadowsocks', core: 'sing-box', security: 'none', transport: 'tcp', port: 8388 },
   { protocol: 'socks5', core: 'sing-box', security: 'none', transport: 'tcp', port: 1080 },
 ];
+const taskTypes = ['sync_config', 'health_check', 'reload_core', 'switch_core_version'];
+const taskTargets = ['gateway', 'server', 'exit'];
 
 function App() {
   const [locale, setLocaleState] = useState<Locale>(() => readLocale());
@@ -104,6 +106,8 @@ function App() {
   const enabledExits = exits.filter((item) => item.enabled).length;
   const taskSuccess = tasks.filter((item) => item.status === 'succeeded').length;
   const healthRate = summary.exitCount === 0 ? 0 : Math.round((summary.healthyExits / summary.exitCount) * 100);
+  const selectedTaskType = taskTypeMeta(taskForm.type, copyText);
+  const selectedTaskTarget = taskTargetLabel(taskForm.targetType, copyText);
   const selectedProtocolServer = servers.find((item) => item.id === protocolForm.serverId);
   const protocolDeploySummary = [
     `${protocolForm.core.toUpperCase()} ${protocolForm.protocol.toUpperCase()}`,
@@ -335,7 +339,7 @@ function App() {
           <ArrowRight className="flow-arrow" size={18} />
           <TrafficStep icon={Activity} label={t.route.exit} title={primaryExit?.name ?? t.route.noExit} meta={primaryExit ? `${primaryExit.type} / ${primaryExit.region || '-'}` : t.route.exitHint} />
           <ArrowRight className="flow-arrow" size={18} />
-          <TrafficStep icon={ShieldCheck} label={t.route.task} title={latestTask?.status ?? t.route.noTask} meta={latestTask?.summary ?? t.route.taskHint} />
+          <TrafficStep icon={ShieldCheck} label={t.route.task} title={latestTask ? taskStatusLabel(latestTask.status, copyText) : t.route.noTask} meta={latestTask?.summary ?? t.route.taskHint} />
         </section>
 
         <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''}`}>
@@ -426,12 +430,25 @@ function App() {
 
             {active === 'tasks' && (
               <form className="control-form" onSubmit={createTask}>
+                <div className="task-guide">
+                  <strong>{selectedTaskType.label}</strong>
+                  <span>{selectedTaskType.desc}</span>
+                  <small>{copyText('作用目标', 'Target scope')}: {selectedTaskTarget}</small>
+                </div>
                 <div className="form-row">
-                  <Field label={t.common.type}><select value={taskForm.type} onChange={(e) => setTaskForm({ ...taskForm, type: e.target.value })}><option>sync_config</option><option>health_check</option><option>reload_core</option><option>switch_core_version</option></select></Field>
-                  <Field label={t.common.target}><select value={taskForm.targetType} onChange={(e) => setTaskForm({ ...taskForm, targetType: e.target.value })}><option>gateway</option><option>server</option><option>exit</option></select></Field>
+                  <Field label={t.common.type}>
+                    <select value={taskForm.type} onChange={(e) => setTaskForm({ ...taskForm, type: e.target.value, summary: taskForm.summary || taskTypeMeta(e.target.value, copyText).summary })}>
+                      {taskTypes.map((type) => <option key={type} value={type}>{taskTypeMeta(type, copyText).label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label={t.common.target}>
+                    <select value={taskForm.targetType} onChange={(e) => setTaskForm({ ...taskForm, targetType: e.target.value })}>
+                      {taskTargets.map((target) => <option key={target} value={target}>{taskTargetLabel(target, copyText)}</option>)}
+                    </select>
+                  </Field>
                 </div>
                 <Field label={t.forms.targetId}><input value={taskForm.targetId} onChange={(e) => setTaskForm({ ...taskForm, targetId: e.target.value })} placeholder={t.forms.targetId} /></Field>
-                <Field label={t.forms.taskSummary}><input value={taskForm.summary} onChange={(e) => setTaskForm({ ...taskForm, summary: e.target.value })} required placeholder={t.forms.taskSummary} /></Field>
+                <Field label={t.forms.taskSummary}><input value={taskForm.summary} onChange={(e) => setTaskForm({ ...taskForm, summary: e.target.value })} required placeholder={selectedTaskType.summary} /></Field>
                 <FormActions primary={t.actions.add} reset={t.actions.reset} onReset={() => setTaskForm(emptyTask)} />
               </form>
             )}
@@ -482,7 +499,7 @@ function App() {
             )}
             {active === 'tasks' && (
               <DataTable headers={[t.common.details, t.common.type, t.common.status, t.common.operations]} empty={tasks.length === 0 ? t.common.empty : ''}>
-                {tasks.map((item) => <DataRow key={item.id} title={item.summary} detail={`${item.type} | ${item.targetType} | ${shortID(item.targetId)}`} status={item.status} good={item.status === 'succeeded'} actions={<IconButton label={t.actions.run} onClick={() => runTask(item.id)} icon={Play} />} />)}
+                {tasks.map((item) => <DataRow key={item.id} title={item.summary} detail={`${taskTypeMeta(item.type, copyText).label} | ${taskTargetLabel(item.targetType, copyText)} | ${shortID(item.targetId)}`} status={taskStatusLabel(item.status, copyText)} good={item.status === 'succeeded'} actions={<IconButton label={t.actions.run} onClick={() => runTask(item.id)} icon={Play} />} />)}
               </DataTable>
             )}
           </section>
@@ -623,6 +640,56 @@ function StatusBadge({ value, good = false }: { value: string; good?: boolean })
 
 function IconButton({ label, onClick, icon: Icon, danger = false, disabled = false }: { label: string; onClick: () => void; icon: LucideIcon; danger?: boolean; disabled?: boolean }) {
   return <button className={`icon-button ${danger ? 'danger' : ''}`} type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick}><Icon size={15} /></button>;
+}
+
+function taskTypeMeta(type: string, copyText: (zh: string, en: string) => string) {
+  const map: Record<string, { label: string; desc: string; summary: string }> = {
+    sync_config: {
+      label: copyText('同步配置', 'Sync Config'),
+      desc: copyText('把总控里的入口、出口、策略配置下发到目标节点，让实际流量按最新规则走。', 'Push the latest gateway, exit, and policy config to the target node.'),
+      summary: copyText('同步目标节点的最新代理配置', 'Sync the latest proxy config to target node'),
+    },
+    health_check: {
+      label: copyText('健康检查', 'Health Check'),
+      desc: copyText('检测出口节点是否可连、延迟是否正常，用于策略调度和故障剔除。', 'Check exit reachability and latency for routing and failover.'),
+      summary: copyText('检查目标出口或服务器健康状态', 'Check target exit or server health'),
+    },
+    reload_core: {
+      label: copyText('重载核心', 'Reload Core'),
+      desc: copyText('让被控端重新加载 Xray 或 sing-box 配置，通常在协议节点变更后执行。', 'Reload Xray or sing-box config on the agent after node changes.'),
+      summary: copyText('重载目标服务器代理核心', 'Reload proxy core on target server'),
+    },
+    switch_core_version: {
+      label: copyText('切换核心版本', 'Switch Core Version'),
+      desc: copyText('切换被控端使用的 Xray 或 sing-box 版本，用于升级、回退或兼容测试。', 'Switch Xray or sing-box version for upgrade, rollback, or compatibility tests.'),
+      summary: copyText('切换目标服务器核心版本', 'Switch target server core version'),
+    },
+    deploy_protocol_node: {
+      label: copyText('部署协议节点', 'Deploy Protocol Node'),
+      desc: copyText('在被控服务器生成协议配置并启动服务。', 'Generate protocol config and start service on the agent server.'),
+      summary: copyText('部署自建协议节点', 'Deploy self-hosted protocol node'),
+    },
+  };
+  return map[type] ?? { label: type, desc: copyText('未知任务类型，保留原始值用于兼容。', 'Unknown task type, raw value kept for compatibility.'), summary: type };
+}
+
+function taskTargetLabel(target: string, copyText: (zh: string, en: string) => string) {
+  const map: Record<string, string> = {
+    gateway: copyText('代理入口', 'Gateway'),
+    server: copyText('被控服务器', 'Agent Server'),
+    exit: copyText('出口节点', 'Exit Node'),
+  };
+  return map[target] ?? target;
+}
+
+function taskStatusLabel(status: string, copyText: (zh: string, en: string) => string) {
+  const map: Record<string, string> = {
+    queued: copyText('排队中', 'Queued'),
+    running: copyText('执行中', 'Running'),
+    succeeded: copyText('成功', 'Succeeded'),
+    failed: copyText('失败', 'Failed'),
+  };
+  return map[status] ?? status;
 }
 
 function splitList(value: string) {
