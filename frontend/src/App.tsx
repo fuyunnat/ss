@@ -47,7 +47,6 @@ type ProtocolForm = {
 };
 
 const emptySummary: Summary = { serverCount: 0, gatewayCount: 0, exitCount: 0, policyCount: 0, taskCount: 0, healthyExits: 0 };
-const emptyServer: ServerNode = { name: '', host: '', region: '', tags: [], agentVersion: '', status: 'unknown', cpuPercent: 0, memoryMb: 0 };
 const emptyGateway: Gateway = { name: '', serverId: '', listenHost: '0.0.0.0', socksPort: 1080, httpPort: 8081, status: 'planned' };
 const emptyExit: ExitNode = { name: '', type: 'external_socks5', serverId: '', address: '', port: 1080, username: '', region: '', weight: 100, enabled: true, health: 'unknown', latencyMs: 0, failureRate: 0 };
 const emptyPolicy: Policy = { name: '', matchType: 'default', matchValue: '*', strategy: 'health_weighted', exitIds: [], sticky: true, enabled: true };
@@ -75,13 +74,11 @@ function App() {
   const [exits, setExits] = useState<ExitNode[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [serverForm, setServerForm] = useState<ServerNode>(emptyServer);
   const [gatewayForm, setGatewayForm] = useState<Gateway>(emptyGateway);
   const [exitForm, setExitForm] = useState<ExitNode>(emptyExit);
   const [policyForm, setPolicyForm] = useState<Policy>(emptyPolicy);
   const [taskForm, setTaskForm] = useState<Task>(emptyTask);
   const [protocolForm, setProtocolForm] = useState<ProtocolForm>(emptyProtocolForm);
-  const [serverTagsText, setServerTagsText] = useState('');
   const [policyExitIDsText, setPolicyExitIDsText] = useState('');
 
   const t = messages[locale];
@@ -186,16 +183,6 @@ function App() {
       await api.savePolicy({ ...policyForm, exitIds: splitList(policyExitIDsText) });
       setPolicyForm(emptyPolicy);
       setPolicyExitIDsText('');
-      await refresh();
-    }, t.app.saved);
-  }
-
-  async function saveServer(event: FormEvent) {
-    event.preventDefault();
-    await withAction(async () => {
-      await api.saveServer({ ...serverForm, tags: splitList(serverTagsText) });
-      setServerForm(emptyServer);
-      setServerTagsText('');
       await refresh();
     }, t.app.saved);
   }
@@ -415,16 +402,7 @@ function App() {
                   <code>{installCommand}</code>
                   <button className="secondary-button full" type="button" onClick={copyInstallCommand}><Clipboard size={16} />{t.actions.copy}</button>
                 </div>
-                <form className="control-form" onSubmit={saveServer}>
-                  <Field label={t.common.name}><input value={serverForm.name} onChange={(e) => setServerForm({ ...serverForm, name: e.target.value })} required placeholder={t.forms.serverName} /></Field>
-                  <Field label={t.forms.host}><input value={serverForm.host} onChange={(e) => setServerForm({ ...serverForm, host: e.target.value })} required placeholder={t.forms.host} /></Field>
-                  <div className="form-row">
-                    <Field label={t.forms.region}><input value={serverForm.region} onChange={(e) => setServerForm({ ...serverForm, region: e.target.value })} placeholder="HK" /></Field>
-                    <Field label={t.forms.agentVersion}><input value={serverForm.agentVersion} onChange={(e) => setServerForm({ ...serverForm, agentVersion: e.target.value })} placeholder="0.1.0" /></Field>
-                  </div>
-                  <Field label={t.forms.tags}><input value={serverTagsText} onChange={(e) => setServerTagsText(e.target.value)} placeholder={t.forms.tags} /></Field>
-                  <FormActions primary={serverForm.id ? t.actions.update : t.actions.add} reset={t.actions.reset} onReset={() => { setServerForm(emptyServer); setServerTagsText(''); }} />
-                </form>
+                <AgentAutoOnline copyText={copyText} />
               </>
             )}
 
@@ -491,7 +469,6 @@ function App() {
             {active === 'servers' && (
               <DataTable headers={[t.common.name, t.forms.host, t.common.status, t.common.operations]} empty={servers.length === 0 ? t.common.empty : ''}>
                 {servers.map((item) => <DataRow key={item.id} title={item.name} detail={`${item.host} | ${item.region || '-'} | agent ${item.agentVersion || '-'}`} status={item.status} good={item.status === 'online'} actions={<>
-                  <IconButton label={t.actions.edit} onClick={() => { setServerForm(item); setServerTagsText(item.tags.join(', ')); }} icon={Pencil} />
                   <IconButton label={t.actions.queueReload} onClick={() => queueTask('reload_core', 'server', item.id ?? '', `${t.actions.queueReload}: ${item.name}`)} icon={RotateCw} />
                   <IconButton danger label={t.actions.delete} onClick={() => removeItem('server', item.id)} icon={Trash2} />
                 </>} />)}
@@ -603,6 +580,32 @@ function ProtocolBuilder({
 
 function StepItem({ index, title, text }: { index: string; title: string; text: string }) {
   return <article className="step-item"><b>{index}</b><strong>{title}</strong><span>{text}</span></article>;
+}
+
+function AgentAutoOnline({ copyText }: { copyText: (zh: string, en: string) => string }) {
+  return (
+    <section className="auto-online">
+      <div className="auto-head">
+        <strong>{copyText('安装后自动上线', 'Auto Online After Install')}</strong>
+        <span>{copyText('不需要在面板手动新增被控服务器', 'No manual agent creation is needed in the panel')}</span>
+      </div>
+      <div className="auto-steps">
+        <StepItem index="1" title={copyText('执行脚本', 'Run Installer')} text={copyText('脚本写入 systemd 并启动 Agent', 'Installer creates systemd service and starts agent')} />
+        <StepItem index="2" title={copyText('心跳注册', 'Heartbeat')} text={copyText('Agent 每 30 秒向总控上报一次', 'Agent reports to master every 30 seconds')} />
+        <StepItem index="3" title={copyText('自动入库', 'Auto Register')} text={copyText('总控按名称和地址更新节点记录', 'Master upserts node by name and host')} />
+      </div>
+      <div className="auto-fields">
+        <InfoItem label={copyText('安装时填写', 'Installer Inputs')} value={copyText('节点名称、地区、总控地址、Token', 'Node name, region, master URL, token')} />
+        <InfoItem label={copyText('自动获取', 'Auto Collected')} value={copyText('公网 IP、在线状态、Agent 版本、内存占用', 'Public IP, online status, agent version, memory usage')} />
+        <InfoItem label={copyText('版本规则', 'Version Rule')} value={copyText('Agent 版本写在程序里，每次更新递增并随心跳上报', 'Agent version is compiled, bumped every update, and reported by heartbeat')} />
+        <InfoItem label={copyText('标签', 'Tags')} value={copyText('系统内部自动标记，不再让你手动填写', 'Internal system tags are automatic and hidden from manual input')} />
+      </div>
+    </section>
+  );
+}
+
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return <div className="info-item"><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function HealthTile({ icon: Icon, label, value, detail }: { icon: LucideIcon; label: string; value: string | number; detail: string }) {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -17,7 +18,7 @@ import (
 	"time"
 )
 
-const version = "0.1.0"
+const version = "0.1.1"
 
 type config struct {
 	MasterURL string
@@ -47,7 +48,7 @@ func main() {
 		cfg.NodeName = fallbackHostname()
 	}
 	if cfg.Host == "" {
-		cfg.Host = firstPrivateIP()
+		cfg.Host = detectHost()
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -130,6 +131,34 @@ func fallbackHostname() string {
 		return "controlled-node"
 	}
 	return name
+}
+
+func detectHost() string {
+	if ip := publicIP(); ip != "" {
+		return ip
+	}
+	return firstPrivateIP()
+}
+
+func publicIP() string {
+	client := &http.Client{Timeout: 3 * time.Second}
+	res, err := client.Get("https://api.ipify.org")
+	if err != nil {
+		return ""
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return ""
+	}
+	content, err := io.ReadAll(io.LimitReader(res.Body, 64))
+	if err != nil {
+		return ""
+	}
+	value := strings.TrimSpace(string(content))
+	if net.ParseIP(value) == nil {
+		return ""
+	}
+	return value
 }
 
 func firstPrivateIP() string {

@@ -1,6 +1,6 @@
 # Proxy Control
 
-Go + Vue3 multi-server proxy control panel.
+Go + React + TypeScript + Vite multi-server proxy control panel.
 
 This project is a new management system. It uses mature proxy cores such as Xray or sing-box as the data plane, and focuses on control-plane features:
 
@@ -61,6 +61,9 @@ The installer:
 - writes `/etc/proxy-control/agent.env`
 - creates and starts `proxy-control-agent.service`
 - detects whether `xray` or `sing-box` already exists
+- sends heartbeat to the master automatically, so the controlled server appears in the panel without manual creation
+
+`--node-name` and `--region` are display labels chosen during installation. If `--node-host` is omitted, the agent tries to detect the public IP first and falls back to a local interface IP. Agent version is compiled into the binary and reported by heartbeat; bump it on each agent update.
 
 The installer does not download or execute third-party proxy-core installation scripts automatically. Install Xray or sing-box separately before enabling protocol deployment tasks.
 
