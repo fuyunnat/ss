@@ -714,17 +714,16 @@ button:focus-visible {
 
 .entry-protocol-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
 
 .entry-protocol {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 82px;
-  align-items: center;
-  gap: 7px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
   min-width: 0;
-  min-height: 34px;
+  min-height: 58px;
   padding: 6px 7px;
   border: 1px solid #dce3ea;
   border-radius: 8px;
@@ -741,6 +740,7 @@ button:focus-visible {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  min-height: 18px;
 }
 
 .entry-check input {
@@ -752,7 +752,7 @@ button:focus-visible {
   min-width: 0;
   overflow: hidden;
   color: #0f172a;
-  font-size: 12px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

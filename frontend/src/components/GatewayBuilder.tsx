@@ -112,9 +112,13 @@ export function entrySummary(gateway: Gateway, copyText: (zh: string, en: string
 }
 
 function protocolLabel(protocol: string) {
+  if (protocol === 'vless') return 'VLESS';
+  if (protocol === 'vmess') return 'VMess';
+  if (protocol === 'trojan') return 'Trojan';
+  if (protocol === 'shadowsocks') return 'Shadowsocks';
   if (protocol === 'socks5') return 'SOCKS5';
   if (protocol === 'http') return 'HTTP';
-  return protocol.toUpperCase();
+  return protocol;
 }
 
 function numberValue(value: string) {
