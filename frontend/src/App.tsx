@@ -554,9 +554,8 @@ function ProtocolBuilder({
             </select>
           </Field>
         </div>
-        <div className="form-row three">
+        <div className="form-row">
           <Field label={copyText('核心', 'Core')}><select value={form.core} onChange={(e) => update({ core: e.target.value })}><option>xray</option><option>sing-box</option></select></Field>
-          <Field label={copyText('协议', 'Protocol')}><select value={form.protocol} onChange={(e) => update({ protocol: e.target.value })}><option>vless</option><option>vmess</option><option>trojan</option><option>shadowsocks</option><option>socks5</option></select></Field>
           <Field label={copyText('端口', 'Port')}><input value={form.port} onChange={(e) => update({ port: numberValue(e.target.value) })} type="number" min="1" required /></Field>
         </div>
         <div className="form-row three">
