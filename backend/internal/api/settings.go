@@ -40,8 +40,8 @@ func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 		AIAPIKeyConfigured:   r.aiAPIKey != "",
 		SessionSecretCustom:  r.sessionSecret != "" && r.sessionSecret != "proxy-control-session:"+r.adminPassword,
 		AIModel:              r.aiModel,
-		MasterConfigCommand:  "proxy-control config",
-		AgentConfigCommand:   "proxy-control-agent config",
+		MasterConfigCommand:  "fyss",
+		AgentConfigCommand:   "fyss",
 		MasterServiceName:    "proxy-control",
 		AgentServiceName:     "proxy-control-agent",
 	})

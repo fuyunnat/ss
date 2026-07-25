@@ -10,7 +10,8 @@ INSTALL_DIR="/opt/proxy-control-agent"
 CONFIG_DIR="/etc/proxy-control"
 CONFIG_FILE="${CONFIG_DIR}/agent.env"
 SERVICE_FILE="/etc/systemd/system/proxy-control-agent.service"
-MANAGER_FILE="/usr/bin/proxy-control-agent"
+MANAGER_FILE="/usr/bin/fyss"
+LEGACY_MANAGER_FILE="/usr/bin/proxy-control-agent"
 MASTER_URL="${PROXY_CONTROL_MASTER_URL:-}"
 AGENT_TOKEN="${PROXY_CONTROL_AGENT_TOKEN:-}"
 NODE_NAME="${PROXY_CONTROL_NODE_NAME:-$(hostname)}"
@@ -28,15 +29,15 @@ Proxy Control Agent 安装器
   sudo ./scripts/install-agent.sh --uninstall
 
 安装后管理命令:
-  proxy-control-agent              显示管理菜单
-  proxy-control-agent status       查看 Agent 状态
-  proxy-control-agent start        启动 Agent
-  proxy-control-agent stop         停止 Agent
-  proxy-control-agent restart      重启 Agent
-  proxy-control-agent log          查看实时日志
-  proxy-control-agent config       修改总控地址、Token、节点名称等配置
-  proxy-control-agent update       拉取 GitHub 安装脚本并更新 Agent
-  proxy-control-agent uninstall    卸载 Agent
+  fyss              显示管理菜单
+  fyss status       查看 Agent 状态
+  fyss start        启动 Agent
+  fyss stop         停止 Agent
+  fyss restart      重启 Agent
+  fyss log          查看实时日志
+  fyss config       修改总控地址、Token、节点名称等配置
+  fyss update       拉取 GitHub 安装脚本并更新 Agent
+  fyss uninstall    卸载 Agent
 EOF
 }
 
@@ -186,7 +187,7 @@ CONFIG_FILE="/etc/proxy-control/agent.env"
 BOOTSTRAP_URL="${PROXY_CONTROL_BOOTSTRAP_URL:-https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh}"
 
 show_menu() {
-  echo -e "${green}Proxy Control Agent 管理菜单${plain}"
+  echo -e "${green}fyss Agent 管理菜单${plain}"
   echo "----------------------------------------------"
   echo "  1. 启动 Agent"
   echo "  2. 停止 Agent"
@@ -293,7 +294,7 @@ uninstall_agent() {
       rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
       systemctl daemon-reload
       rm -rf /opt/proxy-control-agent /etc/proxy-control
-      rm -f /usr/bin/proxy-control-agent
+      rm -f /usr/bin/fyss /usr/bin/proxy-control-agent
       echo -e "${green}已卸载 Proxy Control Agent${plain}"
       ;;
     *) echo -e "${yellow}已取消卸载${plain}" ;;
@@ -310,10 +311,11 @@ case "${1:-menu}" in
   config) config_agent ;;
   update) update_agent ;;
   uninstall) uninstall_agent ;;
-  *) echo "用法: proxy-control-agent {start|stop|restart|status|log|config|update|uninstall}"; exit 1 ;;
+  *) echo "用法: fyss {start|stop|restart|status|log|config|update|uninstall}"; exit 1 ;;
 esac
 EOF
   chmod 0755 "$MANAGER_FILE"
+  ln -sf "$MANAGER_FILE" "$LEGACY_MANAGER_FILE"
 }
 
 copy_source_for_update() {
@@ -338,13 +340,13 @@ print_result() {
   echo
   info "Proxy Control Agent 安装完成，服务已启动"
   echo "----------------------------------------------"
-  echo "proxy-control-agent              - 显示管理菜单"
-  echo "proxy-control-agent status       - 查看 Agent 状态"
-  echo "proxy-control-agent restart      - 重启 Agent"
-  echo "proxy-control-agent log          - 查看实时日志"
-  echo "proxy-control-agent config       - 修改配置"
-  echo "proxy-control-agent update       - 更新 Agent"
-  echo "proxy-control-agent uninstall    - 卸载 Agent"
+  echo "fyss              - 显示管理菜单"
+  echo "fyss status       - 查看 Agent 状态"
+  echo "fyss restart      - 重启 Agent"
+  echo "fyss log          - 查看实时日志"
+  echo "fyss config       - 修改配置"
+  echo "fyss update       - 更新 Agent"
+  echo "fyss uninstall    - 卸载 Agent"
   echo "----------------------------------------------"
   if command -v xray >/dev/null 2>&1; then
     echo "检测到 xray: $(command -v xray)"
@@ -358,6 +360,14 @@ print_result() {
   fi
 }
 
+open_manager_menu() {
+  if [ -r /dev/tty ]; then
+    echo
+    info "打开 fyss 管理菜单"
+    "$MANAGER_FILE" menu </dev/tty
+  fi
+}
+
 uninstall_agent() {
   read -r -p "确认卸载 Proxy Control Agent? [y/N]: " confirm
   case "$confirm" in
@@ -366,7 +376,7 @@ uninstall_agent() {
       rm -f "$SERVICE_FILE"
       systemctl daemon-reload
       rm -rf "$INSTALL_DIR" "$CONFIG_DIR"
-      rm -f "$MANAGER_FILE"
+      rm -f "$MANAGER_FILE" "$LEGACY_MANAGER_FILE"
       info "已卸载 Proxy Control Agent"
       ;;
     *) warn "已取消卸载" ;;
@@ -385,6 +395,7 @@ main() {
   write_manager
   start_service
   print_result
+  open_manager_menu
 }
 
 if [ "$ACTION" = "uninstall" ]; then

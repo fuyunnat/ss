@@ -1,4 +1,4 @@
-# Proxy Control
+# fyss
 
 多服务器代理总控面板。
 
@@ -28,18 +28,19 @@ http://服务器IP:8080
 安装后请进入服务器执行：
 
 ```bash
-proxy-control
+fyss
 ```
 
 常用命令：
 
 ```bash
-proxy-control status      # 查看状态
-proxy-control restart     # 重启主控
-proxy-control log         # 查看日志
-proxy-control config      # 修改端口、账号密码、Agent Token
-proxy-control update      # 更新主控
-proxy-control uninstall   # 卸载主控
+fyss              # 打开管理菜单
+fyss status       # 查看状态
+fyss restart      # 重启主控
+fyss log          # 查看日志
+fyss config       # 修改端口、账号密码、Agent Token
+fyss update       # 更新主控
+fyss uninstall    # 卸载主控
 ```
 
 ## 安装被控端
@@ -60,12 +61,13 @@ curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-m
 被控端管理命令：
 
 ```bash
-proxy-control-agent status      # 查看状态
-proxy-control-agent restart     # 重启被控端
-proxy-control-agent log         # 查看日志
-proxy-control-agent config      # 修改主控地址、Token、节点名称、地区
-proxy-control-agent update      # 更新被控端
-proxy-control-agent uninstall   # 卸载被控端
+fyss              # 打开管理菜单
+fyss status       # 查看状态
+fyss restart      # 重启被控端
+fyss log          # 查看日志
+fyss config       # 修改主控地址、Token、节点名称、地区
+fyss update       # 更新被控端
+fyss uninstall    # 卸载被控端
 ```
 
-`Agent Token` 在主控安装完成时会打印出来，也可以在主控服务器执行 `proxy-control config` 查看或修改。
+`Agent Token` 在主控安装完成时会打印出来，也可以在主控服务器执行 `fyss config` 查看或修改。

@@ -11,7 +11,8 @@ CONFIG_DIR="/etc/proxy-control"
 DATA_DIR="/var/lib/proxy-control"
 CONFIG_FILE="${CONFIG_DIR}/master.env"
 SERVICE_FILE="/etc/systemd/system/proxy-control.service"
-MANAGER_FILE="/usr/bin/proxy-control"
+MANAGER_FILE="/usr/bin/fyss"
+LEGACY_MANAGER_FILE="/usr/bin/proxy-control"
 HTTP_ADDR="${PROXY_CONTROL_HTTP_ADDR:-:8080}"
 ADMIN_USERNAME="${PROXY_CONTROL_ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${PROXY_CONTROL_ADMIN_PASSWORD:-admin}"
@@ -28,15 +29,15 @@ Proxy Control 主控安装器
   sudo ./scripts/install-master.sh --uninstall
 
 安装后管理命令:
-  proxy-control              显示管理菜单
-  proxy-control status       查看主控状态
-  proxy-control start        启动主控
-  proxy-control stop         停止主控
-  proxy-control restart      重启主控
-  proxy-control log          查看实时日志
-  proxy-control config       修改端口、账号密码、Agent Token
-  proxy-control update       拉取 GitHub 安装脚本并更新主控
-  proxy-control uninstall    卸载主控
+  fyss              显示管理菜单
+  fyss status       查看主控状态
+  fyss start        启动主控
+  fyss stop         停止主控
+  fyss restart      重启主控
+  fyss log          查看实时日志
+  fyss config       修改端口、账号密码、Agent Token
+  fyss update       拉取 GitHub 安装脚本并更新主控
+  fyss uninstall    卸载主控
 EOF
 }
 
@@ -176,7 +177,7 @@ CONFIG_FILE="/etc/proxy-control/master.env"
 BOOTSTRAP_URL="${PROXY_CONTROL_MASTER_BOOTSTRAP_URL:-https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh}"
 
 show_menu() {
-  echo -e "${green}Proxy Control 主控管理菜单${plain}"
+  echo -e "${green}fyss 主控管理菜单${plain}"
   echo "----------------------------------------------"
   echo "  1. 启动主控"
   echo "  2. 停止主控"
@@ -289,7 +290,7 @@ uninstall_master() {
       rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
       systemctl daemon-reload
       rm -rf /opt/proxy-control /etc/proxy-control /var/lib/proxy-control
-      rm -f /usr/bin/proxy-control
+      rm -f /usr/bin/fyss /usr/bin/proxy-control
       echo -e "${green}已卸载 Proxy Control 主控${plain}"
       ;;
     *) echo -e "${yellow}已取消卸载${plain}" ;;
@@ -306,10 +307,11 @@ case "${1:-menu}" in
   config) config_master ;;
   update) update_master ;;
   uninstall) uninstall_master ;;
-  *) echo "用法: proxy-control {start|stop|restart|status|log|config|update|uninstall}"; exit 1 ;;
+  *) echo "用法: fyss {start|stop|restart|status|log|config|update|uninstall}"; exit 1 ;;
 esac
 EOF
   chmod 0755 "$MANAGER_FILE"
+  ln -sf "$MANAGER_FILE" "$LEGACY_MANAGER_FILE"
 }
 
 start_service() {
@@ -335,15 +337,23 @@ print_result() {
   echo "默认密码: ${ADMIN_PASSWORD}"
   echo "Agent Token: ${AGENT_TOKEN}"
   echo "----------------------------------------------"
-  echo "proxy-control              - 显示管理菜单"
-  echo "proxy-control status       - 查看主控状态"
-  echo "proxy-control restart      - 重启主控"
-  echo "proxy-control log          - 查看实时日志"
-  echo "proxy-control config       - 修改配置"
-  echo "proxy-control update       - 更新主控"
-  echo "proxy-control uninstall    - 卸载主控"
+  echo "fyss              - 显示管理菜单"
+  echo "fyss status       - 查看主控状态"
+  echo "fyss restart      - 重启主控"
+  echo "fyss log          - 查看实时日志"
+  echo "fyss config       - 修改配置"
+  echo "fyss update       - 更新主控"
+  echo "fyss uninstall    - 卸载主控"
   echo "----------------------------------------------"
-  warn "生产环境请安装后立即使用 proxy-control config 修改默认管理员密码。"
+  warn "生产环境请安装后立即使用 fyss config 修改默认管理员密码。"
+}
+
+open_manager_menu() {
+  if [ -r /dev/tty ]; then
+    echo
+    info "打开 fyss 管理菜单"
+    "$MANAGER_FILE" menu </dev/tty
+  fi
 }
 
 uninstall_master() {
@@ -354,7 +364,7 @@ uninstall_master() {
       rm -f "$SERVICE_FILE"
       systemctl daemon-reload
       rm -rf "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR"
-      rm -f "$MANAGER_FILE"
+      rm -f "$MANAGER_FILE" "$LEGACY_MANAGER_FILE"
       info "已卸载 Proxy Control 主控"
       ;;
     *) warn "已取消卸载" ;;
@@ -370,6 +380,7 @@ main() {
   write_manager
   start_service
   print_result
+  open_manager_menu
 }
 
 if [ "$ACTION" = "uninstall" ]; then

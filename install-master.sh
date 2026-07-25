@@ -14,13 +14,15 @@ arch_name="$(uname -m)"
 
 usage() {
   cat <<'EOF'
-Proxy Control 主控一键安装脚本
+fyss 主控一键安装脚本
 
 用法:
   sudo bash install-master.sh [--http-addr :8080] [--admin-user admin] [--admin-password admin] [--agent-token TOKEN]
 
 GitHub 一键安装:
   curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh | sudo bash
+
+安装完成后会自动打开 fyss 管理菜单；以后直接执行 fyss 进入菜单。
 
 环境变量:
   PROXY_CONTROL_REPO_URL  Git 仓库地址，默认: https://github.com/fuyunnat/ss.git
@@ -129,7 +131,7 @@ fi
 
 detect_os
 normalize_arch
-info "开始安装 Proxy Control 主控"
+info "开始安装 fyss 主控"
 echo "系统: ${release}"
 echo "架构: ${arch_name}"
 ensure_dependencies

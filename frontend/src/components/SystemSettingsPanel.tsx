@@ -17,8 +17,8 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
     onNotice(copyText('已复制', 'Copied'));
   }
 
-  const masterCommand = settings?.masterConfigCommand || 'proxy-control config';
-  const agentCommand = settings?.agentConfigCommand || 'proxy-control-agent config';
+  const masterCommand = settings?.masterConfigCommand || 'fyss';
+  const agentCommand = settings?.agentConfigCommand || 'fyss';
 
   return (
     <div className="settings-page">

@@ -14,7 +14,7 @@ arch_name="$(uname -m)"
 
 usage() {
   cat <<'EOF'
-Proxy Control Agent 一键安装脚本
+fyss Agent 一键安装脚本
 
 用法:
   sudo bash install-agent.sh --master-url URL --token TOKEN [--node-name NAME] [--region REGION] [--node-host HOST]
@@ -26,6 +26,8 @@ Proxy Control Agent 一键安装脚本
 示例:
   curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh \
     | sudo bash -s -- --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK
+
+安装完成后会自动打开 fyss 管理菜单；以后直接执行 fyss 进入菜单。
 EOF
 }
 
@@ -126,7 +128,7 @@ fi
 
 detect_os
 normalize_arch
-info "开始安装 Proxy Control Agent"
+info "开始安装 fyss Agent"
 echo "系统: ${release}"
 echo "架构: ${arch_name}"
 ensure_dependencies
