@@ -27,6 +27,7 @@ GitHub 一键安装:
   下载已经编译好的 Linux 主控安装包，不在服务器上安装 Go、Node 或 npm。
   安装包内包含主控二进制和前端 dist，解压后安装到 /opt/proxy-control，
   并注册 systemd 服务。
+  如果检测到已启用的 firewalld 或 ufw，会自动放行面板端口和默认主入口端口。
 
 安装完成后会自动打开 fyss 管理菜单；以后直接执行 fyss 进入菜单。
 
@@ -34,6 +35,8 @@ GitHub 一键安装:
   PROXY_CONTROL_GITHUB_REPO          GitHub 仓库，默认: fuyunnat/ss
   PROXY_CONTROL_VERSION              Release 版本，默认: latest
   PROXY_CONTROL_MASTER_PACKAGE_URL   自定义主控安装包 URL
+  PROXY_CONTROL_FIREWALL_OPEN        是否自动放行防火墙端口，默认: 1
+  PROXY_CONTROL_ENTRY_PORT_RANGE     主入口端口范围，默认: 30000-30005
 EOF
 }
 

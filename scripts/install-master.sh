@@ -14,6 +14,8 @@ SERVICE_FILE="/etc/systemd/system/proxy-control.service"
 MANAGER_FILE="/usr/bin/fyss"
 LEGACY_MANAGER_FILE="/usr/bin/proxy-control"
 HTTP_ADDR="${PROXY_CONTROL_HTTP_ADDR:-:8080}"
+ENTRY_PORT_RANGE="${PROXY_CONTROL_ENTRY_PORT_RANGE:-30000-30005}"
+FIREWALL_OPEN="${PROXY_CONTROL_FIREWALL_OPEN:-1}"
 ADMIN_USERNAME="${PROXY_CONTROL_ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${PROXY_CONTROL_ADMIN_PASSWORD:-admin}"
 AGENT_TOKEN="${PROXY_CONTROL_AGENT_TOKEN:-}"
@@ -40,6 +42,10 @@ Proxy Control 主控安装器
   fyss config       修改端口、账号密码、Agent Token
   fyss update       拉取 GitHub 安装脚本并更新主控
   fyss uninstall    卸载主控
+
+防火墙:
+  默认自动放行面板端口和主入口端口 30000-30005。
+  如需关闭自动放行: PROXY_CONTROL_FIREWALL_OPEN=0
 EOF
 }
 
@@ -117,6 +123,47 @@ write_config() {
   chmod 0600 "$CONFIG_FILE"
 }
 
+listen_port() {
+  local value="${1:-}"
+  local port="${value##*:}"
+  case "$port" in
+    ''|*[!0-9]*) return 1 ;;
+    *) printf '%s' "$port" ;;
+  esac
+}
+
+open_firewall() {
+  local http_port
+  if [ "$FIREWALL_OPEN" = "0" ]; then
+    warn "已跳过防火墙端口放行"
+    return
+  fi
+  http_port="$(listen_port "$HTTP_ADDR" || true)"
+  if [ -z "$http_port" ]; then
+    warn "无法识别监听端口 ${HTTP_ADDR}，跳过防火墙自动放行"
+    return
+  fi
+
+  if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    info "检测到 firewalld，放行端口: ${http_port}/tcp, ${ENTRY_PORT_RANGE}/tcp, ${ENTRY_PORT_RANGE}/udp"
+    firewall-cmd --permanent --add-port="${http_port}/tcp" >/dev/null || warn "firewalld 放行 ${http_port}/tcp 失败"
+    firewall-cmd --permanent --add-port="${ENTRY_PORT_RANGE}/tcp" >/dev/null || warn "firewalld 放行 ${ENTRY_PORT_RANGE}/tcp 失败"
+    firewall-cmd --permanent --add-port="${ENTRY_PORT_RANGE}/udp" >/dev/null || warn "firewalld 放行 ${ENTRY_PORT_RANGE}/udp 失败"
+    firewall-cmd --reload >/dev/null || warn "firewalld 重载失败"
+    return
+  fi
+
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    info "检测到 ufw，放行端口: ${http_port}/tcp, ${ENTRY_PORT_RANGE}/tcp, ${ENTRY_PORT_RANGE}/udp"
+    ufw allow "${http_port}/tcp" >/dev/null || warn "ufw 放行 ${http_port}/tcp 失败"
+    ufw allow "${ENTRY_PORT_RANGE}/tcp" >/dev/null || warn "ufw 放行 ${ENTRY_PORT_RANGE}/tcp 失败"
+    ufw allow "${ENTRY_PORT_RANGE}/udp" >/dev/null || warn "ufw 放行 ${ENTRY_PORT_RANGE}/udp 失败"
+    return
+  fi
+
+  warn "未检测到启用的 firewalld/ufw，跳过系统防火墙自动放行"
+}
+
 build_master() {
   local script_dir repo_root
   mkdir -p "${INSTALL_DIR}/bin" "${INSTALL_DIR}/frontend"
@@ -188,6 +235,8 @@ plain='\033[0m'
 SERVICE_NAME="proxy-control"
 CONFIG_FILE="/etc/proxy-control/master.env"
 BOOTSTRAP_URL="${PROXY_CONTROL_MASTER_BOOTSTRAP_URL:-https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh}"
+ENTRY_PORT_RANGE="${PROXY_CONTROL_ENTRY_PORT_RANGE:-30000-30005}"
+FIREWALL_OPEN="${PROXY_CONTROL_FIREWALL_OPEN:-1}"
 
 show_menu() {
   echo -e "${green}fyss 主控管理菜单${plain}"
@@ -246,6 +295,47 @@ prompt_value() {
   printf '%s' "${value:-$default_value}"
 }
 
+listen_port() {
+  local value="${1:-}"
+  local port="${value##*:}"
+  case "$port" in
+    ''|*[!0-9]*) return 1 ;;
+    *) printf '%s' "$port" ;;
+  esac
+}
+
+open_firewall() {
+  local http_port
+  if [ "$FIREWALL_OPEN" = "0" ]; then
+    echo -e "${yellow}已跳过防火墙端口放行${plain}"
+    return
+  fi
+  http_port="$(listen_port "$1" || true)"
+  if [ -z "$http_port" ]; then
+    echo -e "${yellow}无法识别监听端口 $1，跳过防火墙自动放行${plain}"
+    return
+  fi
+
+  if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    echo -e "${green}检测到 firewalld，放行端口: ${http_port}/tcp, ${ENTRY_PORT_RANGE}/tcp, ${ENTRY_PORT_RANGE}/udp${plain}"
+    firewall-cmd --permanent --add-port="${http_port}/tcp" >/dev/null || true
+    firewall-cmd --permanent --add-port="${ENTRY_PORT_RANGE}/tcp" >/dev/null || true
+    firewall-cmd --permanent --add-port="${ENTRY_PORT_RANGE}/udp" >/dev/null || true
+    firewall-cmd --reload >/dev/null || true
+    return
+  fi
+
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    echo -e "${green}检测到 ufw，放行端口: ${http_port}/tcp, ${ENTRY_PORT_RANGE}/tcp, ${ENTRY_PORT_RANGE}/udp${plain}"
+    ufw allow "${http_port}/tcp" >/dev/null || true
+    ufw allow "${ENTRY_PORT_RANGE}/tcp" >/dev/null || true
+    ufw allow "${ENTRY_PORT_RANGE}/udp" >/dev/null || true
+    return
+  fi
+
+  echo -e "${yellow}未检测到启用的 firewalld/ufw，跳过系统防火墙自动放行${plain}"
+}
+
 config_master() {
   [ "$(id -u)" -eq 0 ] || { echo -e "${red}请使用 root 运行${plain}"; exit 1; }
   local http_addr admin_user admin_password agent_token session_secret data_dir frontend_dir cors_origin
@@ -274,6 +364,7 @@ config_master() {
     write_env_line "PROXY_CONTROL_AGENT_TOKEN" "$agent_token"
   } > "$CONFIG_FILE"
   chmod 0600 "$CONFIG_FILE"
+  open_firewall "$http_addr"
   systemctl restart "$SERVICE_NAME"
   echo -e "${green}配置已保存，主控已重启${plain}"
 }
@@ -395,6 +486,7 @@ main() {
   build_master
   write_service
   write_manager
+  open_firewall
   start_service
   print_result
   open_manager_menu

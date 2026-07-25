@@ -25,6 +25,21 @@ Go 主控二进制 -> /opt/proxy-control/bin/proxy-control
 管理命令     -> /usr/bin/fyss
 ```
 
+如果服务器启用了 `firewalld` 或 `ufw`，主控安装脚本会自动放行：
+
+```text
+面板端口：8080/tcp，或你用 --http-addr 指定的端口
+主入口端口：30000-30005/tcp
+主入口端口：30000-30005/udp
+```
+
+脚本不会强行开启防火墙。只在防火墙已经启用时添加规则。需要关闭自动放行时：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh \
+  | sudo env PROXY_CONTROL_FIREWALL_OPEN=0 bash
+```
+
 需要指定版本时：
 
 ```bash
@@ -86,6 +101,8 @@ Agent 二进制 -> /opt/proxy-control-agent/proxy-control-agent
 系统服务     -> proxy-control-agent.service
 管理命令     -> /usr/bin/fyss
 ```
+
+被控端默认只主动连接主控上报心跳，不需要开放入站端口。以后如果某台被控直接监听协议节点端口，按该节点实际端口在服务器防火墙里放行。
 
 二进制安装包由 GitHub Actions 在发布 tag 时生成：
 
