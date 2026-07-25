@@ -1,5 +1,5 @@
 import { FormEvent } from 'react';
-import { Zap } from 'lucide-react';
+import { Server, Zap } from 'lucide-react';
 import type { ProtocolForm, ServerNode } from '../types';
 import { Field, StatusBadge } from './ui';
 
@@ -37,6 +37,7 @@ export function ProtocolBuilder({
   const update = (patch: Partial<ProtocolForm>) => onChange({ ...form, ...patch });
   const hasServer = servers.length > 0;
   const isDokodemo = form.protocol === 'dokodemo-door';
+  const selectedServer = servers.find((server) => server.id === form.serverId);
 
   function applyPreset(preset: ProtocolPreset) {
     update({
@@ -62,16 +63,16 @@ export function ProtocolBuilder({
     <section className="protocol-builder">
       <div className="builder-head">
         <div>
-          <span>{copyText('添加入站', 'Add Inbound')}</span>
-          <strong>{copyText('按 x-ui 的入站字段创建协议节点', 'Create protocol nodes with x-ui style inbound fields')}</strong>
+          <span>{copyText('创建出口节点', 'Create Exit Node')}</span>
+          <strong>{copyText('先选被控服务器，再选择主控可调度的出口协议', 'Pick a controlled server, then create an exit protocol for routing')}</strong>
         </div>
         <StatusBadge value={hasServer ? copyText('可创建', 'ready') : copyText('先上线服务器', 'install first')} good={hasServer} />
       </div>
 
       <div className="simple-path">
-        <span className={hasServer ? 'done' : ''}>{copyText('1 服务器在线', '1 Agent online')}</span>
-        <span>{copyText('2 选协议', '2 Pick protocol')}</span>
-        <span>{copyText('3 创建任务', '3 Queue deploy')}</span>
+        <span className={hasServer ? 'done' : ''}>{copyText('1 被控服务器在线', '1 Agent online')}</span>
+        <span className={form.serverId ? 'done' : ''}>{copyText('2 选择出口服务器', '2 Pick exit server')}</span>
+        <span>{copyText('3 创建出口协议', '3 Create exit protocol')}</span>
       </div>
 
       <div className="preset-grid">
@@ -95,17 +96,34 @@ export function ProtocolBuilder({
             <span>{copyText('先去“服务器上线”一键安装被控，心跳后这里会自动出现服务器。', 'Use one-click Agent install first; the server appears here after heartbeat.')}</span>
           </div>
         )}
-        <div className="form-row">
-          <Field label={copyText('要装在哪台服务器', 'Install On')}>
-            <select value={form.serverId} onChange={(event) => update({ serverId: event.target.value })}>
-              <option value="">{copyText('先选择 Agent，没有就先安装', 'Choose an agent, install one first if empty')}</option>
-              {servers.map((server) => <option key={server.id} value={server.id}>{server.name} / {server.host}</option>)}
-            </select>
-          </Field>
-          <ToggleField label={copyText('启用', 'Enabled')} checked={form.enabled} onChange={(enabled) => update({ enabled })} />
-        </div>
+        <section className="server-picker">
+          <div className="server-picker-head">
+            <div>
+              <span>{copyText('出口服务器', 'Exit Server')}</span>
+              <strong>{selectedServer ? `${selectedServer.name} / ${selectedServer.host}` : copyText('请选择要作为出口的被控服务器', 'Choose the controlled server used as exit')}</strong>
+            </div>
+            <ToggleField label={copyText('启用出口', 'Enable Exit')} checked={form.enabled} onChange={(enabled) => update({ enabled })} />
+          </div>
+          <div className="server-option-grid">
+            {servers.map((server) => (
+              <button
+                key={server.id}
+                className={form.serverId === server.id ? 'server-option active' : 'server-option'}
+                type="button"
+                onClick={() => update({ serverId: server.id ?? '' })}
+              >
+                <Server size={15} />
+                <span>
+                  <strong>{server.name}</strong>
+                  <small>{server.host} / {server.region || '-'}</small>
+                </span>
+                <StatusBadge value={server.status || 'unknown'} good={server.status === 'online'} />
+              </button>
+            ))}
+          </div>
+        </section>
         <div className="form-row three">
-          <Field label={copyText('备注', 'Remark')}><input value={form.name} onChange={(event) => update({ name: event.target.value })} required placeholder="hk-vless-01" /></Field>
+          <Field label={copyText('节点名称', 'Node Name')}><input value={form.name} onChange={(event) => update({ name: event.target.value })} required placeholder="hk-vless-01" /></Field>
           <Field label={copyText('协议', 'Protocol')}>
             <select value={form.protocol} onChange={(event) => updateProtocol(event.target.value)}>
               {presets.map((preset) => <option key={preset.protocol} value={preset.protocol}>{preset.protocol}</option>)}
@@ -157,8 +175,8 @@ export function ProtocolBuilder({
         </details>
 
         <div className="deploy-preview">
-          <span>{copyText('将创建部署任务', 'Deploy task preview')}</span>
-          <strong>{summary}</strong>
+          <span>{copyText('将创建出口部署任务', 'Exit deploy task preview')}</span>
+          <strong>{selectedServer ? `${selectedServer.name} -> ${summary}` : summary}</strong>
         </div>
 
         <div className="form-actions">

@@ -88,6 +88,7 @@ function App() {
   const selectedPolicyMatch = policyMatchMeta(policyForm.matchType, copyText);
   const selectedPolicyStrategy = policyStrategyMeta(policyForm.strategy, copyText);
   const selectedProtocolServer = servers.find((item) => item.id === protocolForm.serverId);
+  const serverByID = useMemo(() => new Map(servers.map((server) => [server.id, server])), [servers]);
   const protocolDeploySummary = [
     `${protocolForm.core.toUpperCase()} ${protocolForm.protocol.toUpperCase()}`,
     `${copyText('监听端口', 'listen')} ${protocolForm.port}`,
@@ -484,12 +485,17 @@ function App() {
               </DataTable>
             )}
             {active === 'exits' && (
-              <DataTable headers={[t.common.name, t.common.type, t.common.endpoint, t.common.operations]} empty={exits.length === 0 ? t.common.empty : ''}>
-                {exits.map((item) => <DataRow key={item.id} title={item.name} detail={`${item.type} | ${item.region || '-'} | weight ${item.weight}`} status={item.health || `${item.address}:${item.port}`} good={item.health === 'healthy'} actions={<>
-                  <IconButton label={t.actions.edit} onClick={() => setExitForm(item)} icon={Pencil} />
-                  <IconButton label={t.actions.queueHealth} onClick={() => queueTask('health_check', 'exit', item.id ?? '', `${t.actions.queueHealth}: ${item.name}`)} icon={ShieldCheck} />
-                  <IconButton danger label={t.actions.delete} onClick={() => removeItem('exit', item.id)} icon={Trash2} />
-                </>} />)}
+              <DataTable headers={[t.common.name, copyText('绑定服务器 / 协议', 'Server / Protocol'), t.common.status, t.common.operations]} empty={exits.length === 0 ? t.common.empty : ''}>
+                {exits.map((item) => {
+                  const server = item.serverId ? serverByID.get(item.serverId) : undefined;
+                  const serverText = server ? `${server.name} / ${server.host} / ${server.status || '-'}` : copyText('未绑定被控服务器', 'No controlled server bound');
+                  const endpoint = `${item.address}:${item.port}`;
+                  return <DataRow key={item.id} title={item.name} detail={`${serverText} | ${item.type} | ${endpoint} | ${item.region || '-'} | weight ${item.weight}`} status={item.health || endpoint} good={item.health === 'healthy'} actions={<>
+                    <IconButton label={t.actions.edit} onClick={() => setExitForm(item)} icon={Pencil} />
+                    <IconButton label={t.actions.queueHealth} onClick={() => queueTask('health_check', 'exit', item.id ?? '', `${t.actions.queueHealth}: ${item.name}`)} icon={ShieldCheck} />
+                    <IconButton danger label={t.actions.delete} onClick={() => removeItem('exit', item.id)} icon={Trash2} />
+                  </>} />;
+                })}
               </DataTable>
             )}
             {active === 'policies' && (
