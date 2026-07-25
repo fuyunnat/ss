@@ -17,15 +17,22 @@ type ServerNode struct {
 }
 
 type Gateway struct {
-	ID         string    `json:"id"`
-	Name       string    `json:"name"`
-	ServerID   string    `json:"serverId"`
-	ListenHost string    `json:"listenHost"`
-	SocksPort  int       `json:"socksPort"`
-	HTTPPort   int       `json:"httpPort"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	ID         string             `json:"id"`
+	Name       string             `json:"name"`
+	ServerID   string             `json:"serverId"`
+	ListenHost string             `json:"listenHost"`
+	SocksPort  int                `json:"socksPort"`
+	HTTPPort   int                `json:"httpPort"`
+	Protocols  []ProtocolListener `json:"protocols"`
+	Status     string             `json:"status"`
+	CreatedAt  time.Time          `json:"createdAt"`
+	UpdatedAt  time.Time          `json:"updatedAt"`
+}
+
+type ProtocolListener struct {
+	Protocol string `json:"protocol"`
+	Port     int    `json:"port"`
+	Enabled  bool   `json:"enabled"`
 }
 
 type ExitNode struct {

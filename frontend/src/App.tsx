@@ -25,6 +25,7 @@ import { api, AuthError, clearAuthSession, getAuthSession } from './api';
 import { AgentAutoOnline } from './components/AgentAutoOnline';
 import { AIAssistant } from './components/AIAssistant';
 import { BeginnerFlow } from './components/BeginnerFlow';
+import { GatewayBuilder, entrySummary, gatewayProtocolDefaults, withLegacyPorts } from './components/GatewayBuilder';
 import { LoginPanel } from './components/LoginPanel';
 import { ProtocolBuilder } from './components/ProtocolBuilder';
 import { Field, StatusBadge } from './components/ui';
@@ -37,7 +38,7 @@ import type { AuthSession, ExitNode, Gateway, Policy, ProtocolForm, ServerNode, 
 type ResourceKind = 'server' | 'gateway' | 'exit' | 'policy';
 
 const emptySummary: Summary = { serverCount: 0, gatewayCount: 0, exitCount: 0, policyCount: 0, taskCount: 0, healthyExits: 0 };
-const emptyGateway: Gateway = { name: '', serverId: '', listenHost: '0.0.0.0', socksPort: 1080, httpPort: 8081, status: 'planned' };
+const emptyGateway: Gateway = { name: '', serverId: '', listenHost: '0.0.0.0', socksPort: 1080, httpPort: 8081, protocols: gatewayProtocolDefaults, status: 'planned' };
 const emptyExit: ExitNode = { name: '', type: 'external_socks5', serverId: '', address: '', port: 1080, username: '', region: '', weight: 100, enabled: true, health: 'unknown', latencyMs: 0, failureRate: 0 };
 const emptyPolicy: Policy = { name: '', matchType: 'default', matchValue: '*', strategy: 'health_weighted', exitIds: [], sticky: true, enabled: true };
 const emptyTask: Task = { type: 'sync_config', status: 'queued', targetType: 'gateway', targetId: '', summary: '', logs: [] };
@@ -165,7 +166,7 @@ function App() {
   async function saveGateway(event: FormEvent) {
     event.preventDefault();
     await withAction(async () => {
-      await api.saveGateway(gatewayForm);
+      await api.saveGateway(withLegacyPorts(gatewayForm));
       setGatewayForm(emptyGateway);
       await refresh();
     }, t.app.saved);
@@ -389,16 +390,13 @@ function App() {
           <section className="config-panel">
             <PanelHeader icon={activeNav.icon} title={activeNav.label} desc={panelDesc(active, copyText)} />
             {active === 'gateways' && (
-              <form className="control-form" onSubmit={saveGateway}>
-                <Field label={t.common.name}><input value={gatewayForm.name} onChange={(e) => setGatewayForm({ ...gatewayForm, name: e.target.value })} required placeholder={t.forms.gatewayName} /></Field>
-                <Field label={t.forms.serverId}><input value={gatewayForm.serverId} onChange={(e) => setGatewayForm({ ...gatewayForm, serverId: e.target.value })} placeholder={copyText('可为空，后续绑定 Agent', 'Optional until agent binding')} /></Field>
-                <div className="form-row three">
-                  <Field label={t.forms.listenHost}><input value={gatewayForm.listenHost} onChange={(e) => setGatewayForm({ ...gatewayForm, listenHost: e.target.value })} required /></Field>
-                  <Field label={t.forms.socksPort}><input value={gatewayForm.socksPort} onChange={(e) => setGatewayForm({ ...gatewayForm, socksPort: numberValue(e.target.value) })} type="number" min="1" /></Field>
-                  <Field label={t.forms.httpPort}><input value={gatewayForm.httpPort} onChange={(e) => setGatewayForm({ ...gatewayForm, httpPort: numberValue(e.target.value) })} type="number" min="1" /></Field>
-                </div>
-                <FormActions primary={gatewayForm.id ? t.actions.update : t.actions.add} reset={t.actions.reset} onReset={() => setGatewayForm(emptyGateway)} />
-              </form>
+              <GatewayBuilder
+                copyText={copyText}
+                form={gatewayForm}
+                onChange={setGatewayForm}
+                onSubmit={saveGateway}
+                onReset={() => setGatewayForm(emptyGateway)}
+              />
             )}
 
             {active === 'exits' && (
@@ -518,8 +516,8 @@ function App() {
             </div>
             {active === 'gateways' && (
               <DataTable headers={[t.common.name, t.common.endpoint, t.common.status, t.common.operations]} empty={gateways.length === 0 ? t.common.empty : ''}>
-                {gateways.map((item) => <DataRow key={item.id} title={item.name} detail={`${item.listenHost} | SOCKS ${item.socksPort} | HTTP ${item.httpPort}`} status={item.status} actions={<>
-                  <IconButton label={t.actions.edit} onClick={() => setGatewayForm(item)} icon={Pencil} />
+                {gateways.map((item) => <DataRow key={item.id} title={item.name} detail={`${item.listenHost} | ${entrySummary(item, copyText)}`} status={item.status} actions={<>
+                  <IconButton label={t.actions.edit} onClick={() => setGatewayForm(withLegacyPorts(item))} icon={Pencil} />
                   <IconButton label={t.actions.queueSync} onClick={() => queueTask('sync_config', 'gateway', item.id ?? '', `${t.actions.queueSync}: ${item.name}`)} icon={RotateCw} />
                   <IconButton danger label={t.actions.delete} onClick={() => removeItem('gateway', item.id)} icon={Trash2} />
                 </>} />)}

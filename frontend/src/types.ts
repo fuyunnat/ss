@@ -26,7 +26,14 @@ export interface Gateway {
   listenHost: string;
   socksPort: number;
   httpPort: number;
+  protocols: ProtocolListener[];
   status: string;
+}
+
+export interface ProtocolListener {
+  protocol: string;
+  port: number;
+  enabled: boolean;
 }
 
 export interface ExitNode {
