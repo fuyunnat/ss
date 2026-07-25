@@ -66,6 +66,25 @@ func (s *FileStore) SaveAdminConfig(input AdminConfig) error {
 	return s.saveLocked()
 }
 
+func (s *FileStore) AIConfig() (AIConfig, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.state.AI == nil || (s.state.AI.BaseURL == "" && s.state.AI.APIKey == "" && s.state.AI.Model == "") {
+		return AIConfig{}, false
+	}
+	return *s.state.AI, true
+}
+
+func (s *FileStore) SaveAIConfig(input AIConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	input.UpdatedAt = time.Now().UTC()
+	s.state.AI = &input
+	return s.saveLocked()
+}
+
 func (s *FileStore) ListServers() []ServerNode {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

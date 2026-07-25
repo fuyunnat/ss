@@ -357,6 +357,83 @@ func TestAIChatWithoutBackendConfig(t *testing.T) {
 	}
 }
 
+func TestAISettingsPersistAndConfigureProvider(t *testing.T) {
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected provider path: %s", req.URL.Path)
+		}
+		if req.Header.Get("Authorization") != "Bearer ai-secret" {
+			t.Fatalf("unexpected auth header: %s", req.Header.Get("Authorization"))
+		}
+		var body openAIChatRequest
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			t.Fatalf("decode provider request: %v", err)
+		}
+		if body.Model != "gpt-test" {
+			t.Fatalf("unexpected model: %s", body.Model)
+		}
+		writeJSON(w, http.StatusOK, openAIChatResponse{Choices: []struct {
+			Message openAIMessage `json:"message"`
+		}{{Message: openAIMessage{Role: "assistant", Content: "AI 配置可用"}}}})
+	}))
+	defer provider.Close()
+
+	path := t.TempDir() + "/state.json"
+	st, err := store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/ai", strings.NewReader(`{"baseUrl":"`+provider.URL+`/v1","apiKey":"ai-secret","model":"gpt-test"}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected update status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if strings.Contains(res.Body.String(), "ai-secret") {
+		t.Fatalf("ai settings update leaked api key: %s", res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	authorize(req, token)
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected settings status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	bodyText := res.Body.String()
+	if strings.Contains(bodyText, "ai-secret") {
+		t.Fatalf("settings leaked api key: %s", bodyText)
+	}
+	for _, want := range []string{`"aiConfigured":true`, `"aiApiKeyConfigured":true`, `"aiModel":"gpt-test"`} {
+		if !strings.Contains(bodyText, want) {
+			t.Fatalf("expected settings response to contain %s, got %s", want, bodyText)
+		}
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/ai/chat", strings.NewReader(`{"message":"检查 AI 配置"}`))
+	authorize(req, token)
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected ai chat status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), `"configured":true`) || !strings.Contains(res.Body.String(), "AI 配置可用") {
+		t.Fatalf("unexpected ai chat response: %s", res.Body.String())
+	}
+
+	reopened, err := store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("reopen store: %v", err)
+	}
+	aiConfig, ok := reopened.AIConfig()
+	if !ok || aiConfig.BaseURL != provider.URL+"/v1" || aiConfig.APIKey != "ai-secret" || aiConfig.Model != "gpt-test" {
+		t.Fatalf("unexpected persisted ai config: ok=%v config=%+v", ok, aiConfig)
+	}
+}
+
 func TestSettingsDoesNotExposeSecrets(t *testing.T) {
 	st, err := store.NewFileStore(t.TempDir() + "/state.json")
 	if err != nil {

@@ -161,6 +161,12 @@ export interface AdminCredentialsUpdate {
   newPassword: string;
 }
 
+export interface AISettingsUpdate {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
 export interface AIChatRequest {
   message: string;
 }

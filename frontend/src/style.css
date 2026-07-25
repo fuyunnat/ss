@@ -807,6 +807,10 @@ textarea {
   gap: 8px;
 }
 
+.ai-fields {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.8fr);
+}
+
 .admin-form-footer {
   display: flex;
   align-items: center;
@@ -1641,6 +1645,10 @@ button:focus-visible,
 
   .admin-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ai-fields {
+    grid-template-columns: 1fr;
   }
 
   .control-grid,

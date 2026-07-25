@@ -40,6 +40,7 @@ type Router struct {
 	authVersion         int64
 	sessionSecret       string
 	sessionSecretCustom bool
+	aiMu                sync.RWMutex
 	aiBaseURL           string
 	aiAPIKey            string
 	aiModel             string
@@ -72,6 +73,17 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 		adminSalt = adminConfig.PasswordSalt
 		authVersion = adminConfig.SessionVersion
 	}
+	aiBaseURL := strings.TrimSpace(opts.AIBaseURL)
+	aiAPIKey := strings.TrimSpace(opts.AIAPIKey)
+	aiModel := strings.TrimSpace(opts.AIModel)
+	if aiConfig, ok := st.AIConfig(); ok {
+		aiBaseURL = strings.TrimSpace(aiConfig.BaseURL)
+		aiAPIKey = strings.TrimSpace(aiConfig.APIKey)
+		aiModel = strings.TrimSpace(aiConfig.Model)
+		if aiModel == "" {
+			aiModel = "gpt-4o-mini"
+		}
+	}
 
 	r := &Router{
 		store:               st,
@@ -87,9 +99,9 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 		authVersion:         authVersion,
 		sessionSecret:       opts.SessionSecret,
 		sessionSecretCustom: sessionSecretCustom,
-		aiBaseURL:           strings.TrimSpace(opts.AIBaseURL),
-		aiAPIKey:            strings.TrimSpace(opts.AIAPIKey),
-		aiModel:             opts.AIModel,
+		aiBaseURL:           aiBaseURL,
+		aiAPIKey:            aiAPIKey,
+		aiModel:             aiModel,
 		httpClient:          &http.Client{Timeout: 20 * time.Second},
 	}
 	mux := http.NewServeMux()
@@ -99,6 +111,7 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	mux.HandleFunc("/api/auth/me", r.handleMe)
 	mux.HandleFunc("/api/settings", r.handleSettings)
 	mux.HandleFunc("/api/settings/admin", r.handleAdminSettings)
+	mux.HandleFunc("/api/settings/ai", r.handleAISettings)
 	mux.HandleFunc("/api/ai/chat", r.handleAIChat)
 	mux.HandleFunc("/api/agent/heartbeat", r.handleAgentHeartbeat)
 	mux.HandleFunc("/api/agent/install", r.handleAgentInstall)

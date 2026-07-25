@@ -18,10 +18,21 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
   const [adminForm, setAdminForm] = useState({ username: settings?.adminUsername || 'admin', currentPassword: '', newPassword: '', confirmPassword: '' });
   const [adminSaving, setAdminSaving] = useState(false);
   const [adminError, setAdminError] = useState('');
+  const [aiForm, setAIForm] = useState({ baseUrl: settings?.aiBaseUrl || '', apiKey: '', model: settings?.aiModel || 'gpt-4o-mini' });
+  const [aiSaving, setAISaving] = useState(false);
+  const [aiError, setAIError] = useState('');
 
   useEffect(() => {
     setAdminForm((current) => ({ ...current, username: settings?.adminUsername || current.username || 'admin' }));
   }, [settings?.adminUsername]);
+
+  useEffect(() => {
+    setAIForm((current) => ({
+      ...current,
+      baseUrl: settings?.aiBaseUrl || '',
+      model: settings?.aiModel || current.model || 'gpt-4o-mini',
+    }));
+  }, [settings?.aiBaseUrl, settings?.aiModel]);
 
   async function copy(text: string) {
     await navigator.clipboard?.writeText(text);
@@ -51,6 +62,26 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
       setAdminError(err instanceof Error ? err.message : copyText('保存失败', 'Save failed'));
     } finally {
       setAdminSaving(false);
+    }
+  }
+
+  async function saveAI(event: FormEvent) {
+    event.preventDefault();
+    setAIError('');
+    setAISaving(true);
+    try {
+      await api.updateAISettings({
+        baseUrl: aiForm.baseUrl.trim(),
+        apiKey: aiForm.apiKey.trim(),
+        model: aiForm.model.trim() || 'gpt-4o-mini',
+      });
+      setAIForm((current) => ({ ...current, apiKey: '' }));
+      await onRefresh();
+      onNotice(copyText('AI 接口配置已保存', 'AI API settings saved'));
+    } catch (err) {
+      setAIError(err instanceof Error ? err.message : copyText('保存失败', 'Save failed'));
+    } finally {
+      setAISaving(false);
     }
   }
 
@@ -106,6 +137,33 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
           ]}
         />
       </section>
+
+      <form className="admin-credentials ai-credentials" onSubmit={saveAI}>
+        <div className="sub-panel-head">
+          <div>
+            <strong>{copyText('AI 接口配置', 'AI API Config')}</strong>
+            <span>{copyText('在面板里配置接口地址、API Key 和模型；密钥保存后不会回显。', 'Configure base URL, API key, and model in the panel; the key is hidden after saving.')}</span>
+          </div>
+        </div>
+        <div className="admin-fields ai-fields">
+          <label className="field">
+            <span>{copyText('接口地址', 'Base URL')}</span>
+            <input value={aiForm.baseUrl} onChange={(event) => setAIForm({ ...aiForm, baseUrl: event.target.value })} type="url" placeholder="https://api.openai.com/v1" disabled={!loaded || aiSaving} />
+          </label>
+          <label className="field">
+            <span>API Key</span>
+            <input value={aiForm.apiKey} onChange={(event) => setAIForm({ ...aiForm, apiKey: event.target.value })} type="password" autoComplete="off" placeholder={settings?.aiApiKeyConfigured ? copyText('留空保持原密钥', 'Leave blank to keep current key') : copyText('填写后保存', 'Enter key to save')} disabled={!loaded || aiSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('模型', 'Model')}</span>
+            <input value={aiForm.model} onChange={(event) => setAIForm({ ...aiForm, model: event.target.value })} placeholder="gpt-4o-mini" disabled={!loaded || aiSaving} />
+          </label>
+        </div>
+        <div className="admin-form-footer">
+          <span>{aiError || copyText('保存后 AI 运维会立即使用这套配置。', 'AI operations use this config immediately after saving.')}</span>
+          <button className="primary-button compact" type="submit" disabled={!loaded || aiSaving}><Save size={15} />{aiSaving ? copyText('保存中', 'Saving') : copyText('保存 AI 配置', 'Save AI Config')}</button>
+        </div>
+      </form>
 
       <form className="admin-credentials" onSubmit={saveAdmin}>
         <div className="sub-panel-head">

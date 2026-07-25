@@ -2,7 +2,10 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
+
+	"proxy-control/backend/internal/store"
 )
 
 type settingsResponse struct {
@@ -30,12 +33,19 @@ type adminSettingsRequest struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+type aiSettingsRequest struct {
+	BaseURL string `json:"baseUrl"`
+	APIKey  string `json:"apiKey"`
+	Model   string `json:"model"`
+}
+
 func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		methodNotAllowed(w)
 		return
 	}
 	adminUsername, defaultAdminPassword := r.adminSettingsSummary()
+	aiConfig := r.aiConfigSnapshot()
 
 	writeJSON(w, http.StatusOK, settingsResponse{
 		HTTPAddr:             r.httpAddr,
@@ -45,11 +55,11 @@ func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 		AdminUsername:        adminUsername,
 		DefaultAdminPassword: defaultAdminPassword,
 		AgentTokenConfigured: r.agentToken != "",
-		AIConfigured:         r.aiBaseURL != "" && r.aiAPIKey != "",
-		AIBaseURL:            r.aiBaseURL,
-		AIAPIKeyConfigured:   r.aiAPIKey != "",
+		AIConfigured:         aiConfig.configured(),
+		AIBaseURL:            aiConfig.BaseURL,
+		AIAPIKeyConfigured:   aiConfig.APIKey != "",
 		SessionSecretCustom:  r.sessionSecretCustom,
-		AIModel:              r.aiModel,
+		AIModel:              aiConfig.Model,
 		MasterConfigCommand:  "fyss",
 		AgentConfigCommand:   "fyss",
 		MasterServiceName:    "proxy-control",
@@ -121,4 +131,60 @@ func (r *Router) handleAdminSettings(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, session)
+}
+
+func (r *Router) handleAISettings(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPut {
+		methodNotAllowed(w)
+		return
+	}
+
+	var input aiSettingsRequest
+	if !decodeJSON(w, req, &input) {
+		return
+	}
+	baseURL := strings.TrimSpace(input.BaseURL)
+	apiKey := strings.TrimSpace(input.APIKey)
+	model := strings.TrimSpace(input.Model)
+	if model == "" {
+		model = "gpt-4o-mini"
+	}
+	if baseURL != "" {
+		parsed, err := url.ParseRequestURI(baseURL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			writeError(w, http.StatusBadRequest, "AI 接口地址必须是 http 或 https 地址")
+			return
+		}
+	}
+	if len(model) > 120 {
+		writeError(w, http.StatusBadRequest, "模型名称过长")
+		return
+	}
+
+	current := r.aiConfigSnapshot()
+	if apiKey == "" {
+		apiKey = current.APIKey
+	}
+	next := store.AIConfig{
+		BaseURL: baseURL,
+		APIKey:  apiKey,
+		Model:   model,
+	}
+	if err := r.store.SaveAIConfig(next); err != nil {
+		writeError(w, http.StatusInternalServerError, "保存 AI 配置失败")
+		return
+	}
+
+	r.aiMu.Lock()
+	r.aiBaseURL = next.BaseURL
+	r.aiAPIKey = next.APIKey
+	r.aiModel = next.Model
+	r.aiMu.Unlock()
+
+	writeJSON(w, http.StatusOK, settingsResponse{
+		AIConfigured:       next.BaseURL != "" && next.APIKey != "",
+		AIBaseURL:          next.BaseURL,
+		AIAPIKeyConfigured: next.APIKey != "",
+		AIModel:            next.Model,
+	})
 }

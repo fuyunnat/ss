@@ -35,6 +35,12 @@ type aiAction struct {
 	RequiresConfirmation bool           `json:"requiresConfirmation"`
 }
 
+type aiRuntimeConfig struct {
+	BaseURL string
+	APIKey  string
+	Model   string
+}
+
 type openAIChatRequest struct {
 	Model       string          `json:"model"`
 	Messages    []openAIMessage `json:"messages"`
@@ -72,7 +78,8 @@ func (r *Router) handleAIChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	actions := inferActionsFromMessage(message)
-	if len(actions) > 0 && (r.aiBaseURL == "" || r.aiAPIKey == "") {
+	aiConfig := r.aiConfigSnapshot()
+	if len(actions) > 0 && !aiConfig.configured() {
 		writeJSON(w, http.StatusOK, aiChatResponse{
 			Configured: false,
 			Reply:      fmt.Sprintf("已从你的描述里识别出 %d 台待安装服务器。补齐总控地址、Agent Token 和 SSH 认证方式后，可以在右侧确认批量安装。", len(actions)),
@@ -82,17 +89,17 @@ func (r *Router) handleAIChat(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if r.aiBaseURL == "" || r.aiAPIKey == "" {
+	if !aiConfig.configured() {
 		writeJSON(w, http.StatusOK, aiChatResponse{
 			Configured: false,
-			Reply:      "后台还没有配置 AI 接口和密钥。请在后端环境变量里配置 PROXY_CONTROL_AI_BASE_URL 和 PROXY_CONTROL_AI_API_KEY。",
-			Plan:       []string{"配置后端 AI 接口地址", "配置后端 AI API Key", "重启后端服务后再使用 AI 助手", "也可以直接粘贴服务器 IP 列表，系统会先生成批量安装草案"},
+			Reply:      "后台还没有配置 AI 接口和密钥。请到系统设置里填写 AI 接口地址、API Key 和模型。",
+			Plan:       []string{"打开系统设置", "填写 AI 接口地址和 API Key", "保存后回到 AI 运维继续使用", "也可以直接粘贴服务器 IP 列表，系统会先生成批量安装草案"},
 			Actions:    []aiAction{},
 		})
 		return
 	}
 
-	reply, err := r.callAIProvider(req.Context(), message)
+	reply, err := r.callAIProvider(req.Context(), message, aiConfig)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -105,9 +112,9 @@ func (r *Router) handleAIChat(w http.ResponseWriter, req *http.Request) {
 	})
 }
 
-func (r *Router) callAIProvider(ctx context.Context, message string) (string, error) {
+func (r *Router) callAIProvider(ctx context.Context, message string, aiConfig aiRuntimeConfig) (string, error) {
 	body := openAIChatRequest{
-		Model:       r.aiModel,
+		Model:       aiConfig.Model,
 		Temperature: 0.2,
 		Messages: []openAIMessage{
 			{
@@ -130,12 +137,12 @@ func (r *Router) callAIProvider(ctx context.Context, message string) (string, er
 		return "", fmt.Errorf("生成 AI 请求失败")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.aiChatURL(), bytes.NewReader(rawBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, aiChatURL(aiConfig.BaseURL), bytes.NewReader(rawBody))
 	if err != nil {
 		return "", fmt.Errorf("AI 接口地址无效")
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+r.aiAPIKey)
+	req.Header.Set("Authorization", "Bearer "+aiConfig.APIKey)
 
 	res, err := r.httpClient.Do(req)
 	if err != nil {
@@ -161,12 +168,31 @@ func (r *Router) callAIProvider(ctx context.Context, message string) (string, er
 	return strings.TrimSpace(output.Choices[0].Message.Content), nil
 }
 
-func (r *Router) aiChatURL() string {
-	base := strings.TrimRight(r.aiBaseURL, "/")
+func aiChatURL(baseURL string) string {
+	base := strings.TrimRight(baseURL, "/")
 	if strings.HasSuffix(base, "/v1") {
 		return base + "/chat/completions"
 	}
 	return base + "/v1/chat/completions"
+}
+
+func (r *Router) aiConfigSnapshot() aiRuntimeConfig {
+	r.aiMu.RLock()
+	defer r.aiMu.RUnlock()
+
+	model := strings.TrimSpace(r.aiModel)
+	if model == "" {
+		model = "gpt-4o-mini"
+	}
+	return aiRuntimeConfig{
+		BaseURL: strings.TrimSpace(r.aiBaseURL),
+		APIKey:  strings.TrimSpace(r.aiAPIKey),
+		Model:   model,
+	}
+}
+
+func (c aiRuntimeConfig) configured() bool {
+	return c.BaseURL != "" && c.APIKey != ""
 }
 
 func (r *Router) aiContextSnapshot() string {

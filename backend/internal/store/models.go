@@ -98,6 +98,7 @@ type State struct {
 	Policies []Policy     `json:"policies"`
 	Tasks    []Task       `json:"tasks"`
 	Admin    *AdminConfig `json:"admin,omitempty"`
+	AI       *AIConfig    `json:"ai,omitempty"`
 }
 
 type Summary struct {
@@ -115,4 +116,11 @@ type AdminConfig struct {
 	PasswordHash   string    `json:"passwordHash"`
 	SessionVersion int64     `json:"sessionVersion"`
 	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
+type AIConfig struct {
+	BaseURL   string    `json:"baseUrl"`
+	APIKey    string    `json:"apiKey,omitempty"`
+	Model     string    `json:"model"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
