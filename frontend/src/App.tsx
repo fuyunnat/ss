@@ -43,6 +43,7 @@ const emptyPolicy: Policy = { name: '', matchType: 'default', matchValue: '*', s
 const emptyTask: Task = { type: 'sync_config', status: 'queued', targetType: 'gateway', targetId: '', summary: '', logs: [] };
 const taskTypes = ['sync_config', 'health_check', 'reload_core', 'switch_core_version'];
 const taskTargets = ['gateway', 'server', 'exit'];
+const supportedExitProtocols = new Set(['vless', 'vmess', 'trojan', 'shadowsocks', 'socks5', 'dokodemo-door']);
 
 function App() {
   const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
@@ -234,6 +235,7 @@ function App() {
       const address = protocolForm.domain.trim() || selectedProtocolServer?.host || 'pending-agent';
       const savedExit = await api.saveExit({
         ...emptyExit,
+        id: protocolForm.exitId || undefined,
         name: nodeName,
         type: `self_${protocolForm.core}_${protocolForm.protocol}`,
         serverId: protocolForm.serverId,
@@ -245,16 +247,55 @@ function App() {
         health: 'unknown',
       });
       await api.createTask({
-        type: 'deploy_protocol_node',
+        type: protocolForm.exitId ? 'sync_config' : 'deploy_protocol_node',
         targetType: protocolForm.serverId ? 'server' : 'exit',
         targetId: protocolForm.serverId || savedExit.id || '',
-        summary: `${copyText('搭建协议节点', 'Deploy protocol node')}: ${nodeName} | ${protocolDeploySummary}`,
+        summary: `${protocolForm.exitId ? copyText('更新协议节点', 'Update protocol node') : copyText('搭建协议节点', 'Deploy protocol node')}: ${nodeName} | ${protocolDeploySummary}`,
         status: 'queued',
         logs: [],
       });
       setExitForm((current) => ({ ...current, serverId: protocolForm.serverId, name: nodeName, type: `self_${protocolForm.core}_${protocolForm.protocol}`, address, port: protocolForm.port }));
       await refresh();
     }, t.app.taskQueued);
+  }
+
+  function parseExitProtocol(item: ExitNode) {
+    if (supportedExitProtocols.has(item.type)) {
+      const preset = protocolPresets.find((candidate) => candidate.protocol === item.type);
+      return { protocol: item.type, core: preset?.core ?? 'xray' };
+    }
+    const parts = item.type.split('_');
+    if (parts.length >= 3 && parts[0] === 'self' && supportedExitProtocols.has(parts.slice(2).join('_'))) {
+      return { core: parts[1] || 'xray', protocol: parts.slice(2).join('_') };
+    }
+    return null;
+  }
+
+  function editExit(item: ExitNode) {
+    const parsed = parseExitProtocol(item);
+    if (!parsed) {
+      setExitForm(item);
+      showNotice(copyText('第三方代理已载入高级表单', 'External proxy loaded into advanced form'));
+      return;
+    }
+    const preset = protocolPresets.find((candidate) => candidate.protocol === parsed.protocol);
+    setProtocolForm({
+      ...createProtocolForm(),
+      exitId: item.id ?? '',
+      name: item.name,
+      serverId: item.serverId,
+      core: parsed.core,
+      protocol: parsed.protocol,
+      security: preset?.security ?? 'none',
+      transport: preset?.transport ?? 'tcp',
+      port: item.port,
+      enabled: item.enabled,
+      domain: item.address,
+      credential: item.username,
+      targetAddress: parsed.protocol === 'dokodemo-door' ? item.address : '',
+      targetPort: parsed.protocol === 'dokodemo-door' ? item.port : 0,
+    } as ProtocolForm);
+    showNotice(copyText('节点已载入左侧编辑表单', 'Node loaded into the left edit form'));
   }
 
   async function copyInstallCommand() {
@@ -491,7 +532,7 @@ function App() {
                   const serverText = server ? `${server.name} / ${server.host} / ${server.status || '-'}` : copyText('未绑定被控服务器', 'No controlled server bound');
                   const endpoint = `${item.address}:${item.port}`;
                   return <DataRow key={item.id} title={item.name} detail={`${serverText} | ${item.type} | ${endpoint} | ${item.region || '-'} | weight ${item.weight}`} status={item.health || endpoint} good={item.health === 'healthy'} actions={<>
-                    <IconButton label={t.actions.edit} onClick={() => setExitForm(item)} icon={Pencil} />
+                    <IconButton label={t.actions.edit} onClick={() => editExit(item)} icon={Pencil} />
                     <IconButton label={t.actions.queueHealth} onClick={() => queueTask('health_check', 'exit', item.id ?? '', `${t.actions.queueHealth}: ${item.name}`)} icon={ShieldCheck} />
                     <IconButton danger label={t.actions.delete} onClick={() => removeItem('exit', item.id)} icon={Trash2} />
                   </>} />;

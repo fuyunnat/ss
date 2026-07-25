@@ -38,6 +38,7 @@ export function ProtocolBuilder({
   const hasServer = servers.length > 0;
   const isDokodemo = form.protocol === 'dokodemo-door';
   const selectedServer = servers.find((server) => server.id === form.serverId);
+  const isEditing = Boolean(form.exitId);
 
   function applyPreset(preset: ProtocolPreset) {
     update({
@@ -63,7 +64,7 @@ export function ProtocolBuilder({
     <section className="protocol-builder">
       <div className="builder-head">
         <div>
-          <span>{copyText('创建出口节点', 'Create Exit Node')}</span>
+          <span>{isEditing ? copyText('编辑出口节点', 'Edit Exit Node') : copyText('创建出口节点', 'Create Exit Node')}</span>
           <strong>{copyText('先选被控服务器，再选择主控可调度的出口协议', 'Pick a controlled server, then create an exit protocol for routing')}</strong>
         </div>
         <StatusBadge value={hasServer ? copyText('可创建', 'ready') : copyText('先上线服务器', 'install first')} good={hasServer} />
@@ -180,7 +181,7 @@ export function ProtocolBuilder({
         </div>
 
         <div className="form-actions">
-          <button className="primary-button" type="submit" disabled={!hasServer}><Zap size={17} />{copyText('创建节点', 'Create Node')}</button>
+          <button className="primary-button" type="submit" disabled={!hasServer}><Zap size={17} />{isEditing ? copyText('更新节点', 'Update Node') : copyText('创建节点', 'Create Node')}</button>
           <button className="secondary-button" type="button" onClick={onReset}>{copyText('恢复默认', 'Reset')}</button>
         </div>
       </form>

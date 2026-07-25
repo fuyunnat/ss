@@ -113,6 +113,7 @@ export interface AIAction {
 }
 
 export interface ProtocolForm {
+  exitId: string;
   name: string;
   serverId: string;
   core: string;

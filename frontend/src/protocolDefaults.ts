@@ -12,6 +12,7 @@ export const protocolPresets: ProtocolPreset[] = [
 
 export function createProtocolForm(): ProtocolForm {
   return {
+    exitId: '',
     name: 'hk-vless-01',
     serverId: '',
     core: 'xray',
