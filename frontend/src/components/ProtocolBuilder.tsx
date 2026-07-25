@@ -159,7 +159,7 @@ export function ProtocolBuilder({
                   {ssMethods.map((method) => <option key={method} value={method}>{method}</option>)}
                 </select>
               </Field>
-              <Field label={copyText('密码', 'Password')}><input value={form.password} onChange={(event) => update({ password: event.target.value })} required type="password" /></Field>
+              <Field label={copyText('密码', 'Password')}><input value={form.password} onChange={(event) => update({ password: event.target.value })} required /></Field>
               <Field label={copyText('网络', 'Network')}><select value={form.network} onChange={(event) => update({ network: event.target.value })}><option>tcp+udp</option><option>tcp</option><option>udp</option></select></Field>
             </div>
           </section>

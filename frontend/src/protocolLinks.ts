@@ -147,7 +147,7 @@ export function buildProtocolShareInfo(form: ProtocolForm, server?: ServerNode):
     return {
       label: 'Shadowsocks 链接',
       link: `ss://${userInfo}@${host}:${port}#${name}`,
-      rows: [...commonRows, { label: '加密', value: form.method }, { label: '密码', value: mask(form.password) }, { label: '网络', value: form.network }],
+      rows: [...commonRows, { label: '加密', value: form.method }, { label: '密码', value: form.password || '-' }, { label: '网络', value: form.network }],
       canCopy: Boolean(form.method && form.password),
     };
   }
