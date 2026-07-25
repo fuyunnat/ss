@@ -115,12 +115,27 @@ sudo ./scripts/install-agent.sh \
 
 The installer:
 
+- detects Linux distribution and architecture
+- installs missing base dependencies where the system package manager supports it
 - builds `backend/cmd/agent`
 - installs the binary to `/opt/proxy-control-agent/proxy-control-agent`
 - writes `/etc/proxy-control/agent.env`
 - creates and starts `proxy-control-agent.service`
+- installs `/usr/bin/proxy-control-agent` as an x-ui-style management command
 - detects whether `xray` or `sing-box` already exists
 - sends heartbeat to the master automatically, so the controlled server appears in the panel without manual creation
+
+After installation, manage the controlled agent from the VPS with:
+
+```bash
+proxy-control-agent              # show menu
+proxy-control-agent status       # service status
+proxy-control-agent restart      # restart agent
+proxy-control-agent log          # live logs
+proxy-control-agent config       # edit master URL, token, node name, region, host
+proxy-control-agent update       # pull the GitHub installer and update agent
+proxy-control-agent uninstall    # uninstall agent
+```
 
 `--node-name` and `--region` are display labels chosen during installation. If `--node-host` is omitted, the agent tries to detect the public IP first and falls back to a local interface IP. Agent version is compiled into the binary and reported by heartbeat; bump it on each agent update.
 

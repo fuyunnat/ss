@@ -1,23 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+red='\033[0;31m'
+green='\033[0;32m'
+yellow='\033[0;33m'
+plain='\033[0m'
+
 REPO_URL="${PROXY_CONTROL_REPO_URL:-https://github.com/fuyunnat/ss.git}"
 REPO_REF="${PROXY_CONTROL_REPO_REF:-feature/proxy-control-mvp}"
 WORK_DIR=""
+release="unknown"
+arch_name="$(uname -m)"
 
 usage() {
   cat <<'EOF'
-Usage:
+Proxy Control Agent 一键安装脚本
+
+用法:
   sudo bash install-agent.sh --master-url URL --token TOKEN [--node-name NAME] [--region REGION] [--node-host HOST]
 
-Environment:
-  PROXY_CONTROL_REPO_URL  Git repository URL. Default: https://github.com/fuyunnat/ss.git
-  PROXY_CONTROL_REPO_REF  Git branch/tag/commit. Default: feature/proxy-control-mvp
+环境变量:
+  PROXY_CONTROL_REPO_URL  Git 仓库地址，默认: https://github.com/fuyunnat/ss.git
+  PROXY_CONTROL_REPO_REF  Git 分支/标签/commit，默认: feature/proxy-control-mvp
 
-Example:
+示例:
   curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh \
     | sudo bash -s -- --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK
 EOF
+}
+
+info() {
+  echo -e "${green}$*${plain}"
+}
+
+warn() {
+  echo -e "${yellow}$*${plain}"
+}
+
+fail() {
+  echo -e "${red}$*${plain}" >&2
+  exit 1
 }
 
 cleanup() {
@@ -27,26 +49,89 @@ cleanup() {
 }
 trap cleanup EXIT
 
+detect_os() {
+  if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    case "${ID:-}" in
+      ubuntu|debian) release="${ID}" ;;
+      centos|rhel|rocky|almalinux|fedora) release="centos" ;;
+      *) release="${ID:-unknown}" ;;
+    esac
+  elif [ -f /etc/redhat-release ]; then
+    release="centos"
+  fi
+}
+
+normalize_arch() {
+  case "$arch_name" in
+    x86_64|x64|amd64) arch_name="amd64" ;;
+    aarch64|arm64) arch_name="arm64" ;;
+    *) warn "未识别架构 ${arch_name}，继续尝试安装" ;;
+  esac
+}
+
+install_packages() {
+  if command -v apt-get >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+    return
+  fi
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y "$@"
+    return
+  fi
+  if command -v yum >/dev/null 2>&1; then
+    yum install -y "$@"
+    return
+  fi
+  fail "未找到 apt-get/dnf/yum，无法自动安装依赖"
+}
+
+ensure_dependencies() {
+  local missing=()
+  command -v curl >/dev/null 2>&1 || missing+=("curl")
+  command -v git >/dev/null 2>&1 || missing+=("git")
+  command -v go >/dev/null 2>&1 || missing+=("go")
+
+  if [ "${#missing[@]}" -eq 0 ]; then
+    return
+  fi
+
+  warn "检测到缺少依赖: ${missing[*]}，开始自动安装"
+  case "$release" in
+    ubuntu|debian)
+      install_packages ca-certificates curl git golang-go
+      ;;
+    centos|fedora|rocky|almalinux|rhel)
+      install_packages ca-certificates curl git golang
+      ;;
+    *)
+      install_packages ca-certificates curl git golang-go || install_packages ca-certificates curl git golang
+      ;;
+  esac
+
+  command -v curl >/dev/null 2>&1 || fail "curl 安装失败"
+  command -v git >/dev/null 2>&1 || fail "git 安装失败"
+  command -v go >/dev/null 2>&1 || fail "Go 安装失败，请手动安装 Go 1.22 或更高版本后重试"
+}
+
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   usage
   exit 0
 fi
 
 if [ "$(id -u)" -ne 0 ]; then
-  printf 'Please run as root, for example: curl -fsSL URL | sudo bash -s -- --master-url URL --token TOKEN\n' >&2
-  exit 1
+  fail "错误：必须使用 root 用户运行，例如 curl -fsSL URL | sudo bash -s -- --master-url URL --token TOKEN"
 fi
 
-if ! command -v git >/dev/null 2>&1; then
-  printf 'git is required to fetch the agent installer from GitHub.\n' >&2
-  exit 1
-fi
-
-if ! command -v go >/dev/null 2>&1; then
-  printf 'Go is required to build proxy-control-agent on the target server.\n' >&2
-  exit 1
-fi
+detect_os
+normalize_arch
+info "开始安装 Proxy Control Agent"
+echo "系统: ${release}"
+echo "架构: ${arch_name}"
+ensure_dependencies
 
 WORK_DIR="$(mktemp -d)"
+info "拉取安装仓库: ${REPO_URL} (${REPO_REF})"
 git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$WORK_DIR"
 exec "$WORK_DIR/scripts/install-agent.sh" "$@"

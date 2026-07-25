@@ -108,7 +108,7 @@ export function AgentAutoOnline({ copyText, installCommand, onCopied, onInstalle
             <InfoItem label={copyText('凭据', 'Credentials')} value={copyText('SSH 密码和私钥只用于本次请求', 'SSH password and private key are only used for this request')} />
             <InfoItem label={copyText('采集', 'Collected')} value={copyText('公网 IP、在线状态、版本、内存占用', 'Public IP, status, version, and memory usage')} />
             <InfoItem label={copyText('记录', 'Audit')} value={copyText('成功或失败写入操作记录', 'Success or failure is written to task logs')} />
-            <InfoItem label={copyText('依赖', 'Requires')} value={copyText('curl、git、go、systemd、sudo', 'curl, git, go, systemd, and sudo')} />
+            <InfoItem label={copyText('管理', 'Manage')} value={copyText('安装后输入 proxy-control-agent 打开菜单', 'Run proxy-control-agent after install to open the menu')} />
           </div>
           <details className="fallback-install">
             <summary>{copyText('备用：手动安装命令', 'Fallback: manual install command')}</summary>
