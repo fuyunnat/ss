@@ -18,6 +18,7 @@ import {
   RotateCw,
   Route,
   Server,
+  Settings,
   ShieldCheck,
   SkipForward,
   Trash2,
@@ -30,13 +31,14 @@ import { BeginnerFlow } from './components/BeginnerFlow';
 import { GatewayBuilder, entrySummary, gatewayProtocolDefaults, withLegacyPorts } from './components/GatewayBuilder';
 import { LoginPanel } from './components/LoginPanel';
 import { ProtocolBuilder } from './components/ProtocolBuilder';
+import { SystemSettingsPanel } from './components/SystemSettingsPanel';
 import { CustomSelect, Field, StatusBadge, statusLabel } from './components/ui';
 import { numberValue, panelDesc, readLocale, shortID, splitList, taskStatusLabel, taskTargetLabel, taskTypeMeta, type ActiveTab } from './appHelpers';
 import { messages, type Locale } from './i18n';
 import { policyMatchMeta, policyMatchOptions, policyMatchSummary, policyStrategyMeta, policyStrategyOptions } from './policyOptions';
 import { createProtocolForm, protocolPresets } from './protocolDefaults';
 import { applyProtocolSettings, buildProtocolShareInfo, protocolSettingsFromForm } from './protocolLinks';
-import type { AuthSession, ExitNode, Gateway, Policy, ProtocolForm, ServerNode, Summary, Task } from './types';
+import type { AuthSession, ExitNode, Gateway, Policy, ProtocolForm, ServerNode, Summary, SystemSettings, Task } from './types';
 
 type ResourceKind = 'server' | 'gateway' | 'exit' | 'policy';
 
@@ -62,6 +64,7 @@ function App() {
   const [exits, setExits] = useState<ExitNode[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [gatewayForm, setGatewayForm] = useState<Gateway>(emptyGateway);
   const [exitForm, setExitForm] = useState<ExitNode>(emptyExit);
   const [policyForm, setPolicyForm] = useState<Policy>(emptyPolicy);
@@ -81,6 +84,7 @@ function App() {
     { id: 'servers' as const, label: t.nav.servers, count: summary.serverCount, icon: Server, hint: copyText('Agent 纳管', 'Agent fleet') },
     { id: 'tasks' as const, label: t.nav.tasks, count: summary.taskCount, icon: Play, hint: copyText('执行记录', 'Execution logs') },
     { id: 'ai' as const, label: t.nav.ai, count: 0, icon: Bot, hint: copyText('批量运维', 'Batch ops') },
+    { id: 'settings' as const, label: t.nav.settings, icon: Settings, hint: copyText('配置中心', 'Config center') },
   ], [copyText, summary, t]);
 
   const activeNav = navItems.find((item) => item.id === active) ?? navItems[0];
@@ -105,12 +109,14 @@ function App() {
       const [nextSummary, nextServers, nextGateways, nextExits, nextPolicies, nextTasks] = await Promise.all([
         api.summary(), api.servers(), api.gateways(), api.exits(), api.policies(), api.tasks(),
       ]);
+      const nextSettings = await api.settings().catch(() => null);
       setSummary(nextSummary);
       setServers(nextServers ?? []);
       setGateways(nextGateways ?? []);
       setExits(nextExits ?? []);
       setPolicies(nextPolicies ?? []);
       setTasks(nextTasks ?? []);
+      setSettings(nextSettings ?? null);
     } catch (err) {
       handleError(err);
     } finally {
@@ -371,7 +377,7 @@ function App() {
                   <b>{item.label}</b>
                   <small>{item.hint}</small>
                 </span>
-                <strong>{item.count}</strong>
+                {item.count !== undefined && <strong>{item.count}</strong>}
               </button>
             );
           })}
@@ -418,7 +424,7 @@ function App() {
           <HealthTile icon={Database} label={copyText('任务完成', 'Tasks Done')} value={`${taskSuccess}/${summary.taskCount}`} detail={copyText('可审计操作流', 'Auditable actions')} />
         </section>
 
-        <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''} ${active === 'servers' ? 'setup-mode' : ''} ${active === 'ai' ? 'ai-mode' : ''}`}>
+        <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''} ${active === 'servers' ? 'setup-mode' : ''} ${active === 'ai' || active === 'settings' ? 'ai-mode' : ''}`}>
           <section className="config-panel">
             <PanelHeader icon={activeNav.icon} title={activeNav.label} desc={panelDesc(active, copyText)} />
             {active === 'gateways' && (
@@ -546,9 +552,18 @@ function App() {
             {active === 'ai' && (
               <AIAssistant copyText={copyText} onError={setError} onNotice={showNotice} onRefresh={refresh} />
             )}
+
+            {active === 'settings' && (
+              <SystemSettingsPanel
+                copyText={copyText}
+                installCommand={installCommand}
+                settings={settings}
+                onNotice={showNotice}
+              />
+            )}
           </section>
 
-          {active !== 'ai' && <section className="data-panel">
+          {active !== 'ai' && active !== 'settings' && <section className="data-panel">
             <div className="panel-toolbar">
               <div>
                 <span>{loading ? t.app.loading : activeNav.hint}</span>

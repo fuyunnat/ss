@@ -232,6 +232,47 @@ func TestAIChatWithoutBackendConfig(t *testing.T) {
 	}
 }
 
+func TestSettingsDoesNotExposeSecrets(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router := NewRouter(st, Options{
+		CORSAllowOrigin: "http://localhost:5173",
+		HTTPAddr:        ":8080",
+		DataDir:         "/tmp/proxy-control",
+		FrontendDir:     "/opt/proxy-control/frontend/dist",
+		AgentToken:      "agent-secret",
+		AdminUsername:   "admin",
+		AdminPassword:   "strong-password",
+		SessionSecret:   "session-secret",
+		AIBaseURL:       "https://api.example.com/v1",
+		AIAPIKey:        "ai-secret",
+		AIModel:         "gpt-test",
+	})
+	token, err := (&Router{sessionSecret: "session-secret"}).issueToken("admin")
+	if err != nil {
+		t.Fatalf("issue token: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	for _, secret := range []string{"agent-secret", "strong-password", "session-secret", "ai-secret"} {
+		if strings.Contains(body, secret) {
+			t.Fatalf("settings leaked secret %q in response: %s", secret, body)
+		}
+	}
+	if !strings.Contains(body, `"agentTokenConfigured":true`) || !strings.Contains(body, `"aiApiKeyConfigured":true`) {
+		t.Fatalf("expected configured flags, got %s", body)
+	}
+}
+
 func TestAIChatDraftsBatchAgentInstalls(t *testing.T) {
 	st, err := store.NewFileStore(t.TempDir() + "/state.json")
 	if err != nil {

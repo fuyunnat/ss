@@ -27,6 +27,9 @@ func main() {
 
 	handler := api.NewRouter(st, api.Options{
 		CORSAllowOrigin: cfg.CORSAllowOrigin,
+		HTTPAddr:        cfg.HTTPAddr,
+		DataDir:         cfg.DataDir,
+		FrontendDir:     cfg.FrontendDir,
 		AgentToken:      cfg.AgentToken,
 		AdminUsername:   cfg.AdminUsername,
 		AdminPassword:   cfg.AdminPassword,
@@ -40,7 +43,7 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr: cfg.HTTPAddr,
+		Addr:    cfg.HTTPAddr,
 		Handler: handler,
 	}
 

@@ -1,4 +1,4 @@
-import type { AgentInstallRequest, AIChatRequest, AIChatResponse, AuthSession, ExitNode, Gateway, Policy, ServerNode, Summary, Task } from './types';
+import type { AgentInstallRequest, AIChatRequest, AIChatResponse, AuthSession, ExitNode, Gateway, Policy, ServerNode, Summary, SystemSettings, Task } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const SESSION_KEY = 'proxy-control-session';
@@ -55,6 +55,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   login: (payload: { username: string; password: string }) => request<AuthSession>('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   me: () => request<{ username: string }>('/api/auth/me'),
+  settings: () => request<SystemSettings>('/api/settings'),
 
   summary: () => request<Summary>('/api/summary'),
   servers: () => request<ServerNode[]>('/api/servers'),

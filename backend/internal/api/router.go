@@ -12,6 +12,9 @@ import (
 
 type Options struct {
 	CORSAllowOrigin string
+	HTTPAddr        string
+	DataDir         string
+	FrontendDir     string
 	AgentToken      string
 	AdminUsername   string
 	AdminPassword   string
@@ -23,6 +26,10 @@ type Options struct {
 
 type Router struct {
 	store         *store.FileStore
+	httpAddr      string
+	corsOrigin    string
+	dataDir       string
+	frontendDir   string
 	agentToken    string
 	adminUsername string
 	adminPassword string
@@ -49,6 +56,10 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 
 	r := &Router{
 		store:         st,
+		httpAddr:      opts.HTTPAddr,
+		corsOrigin:    opts.CORSAllowOrigin,
+		dataDir:       opts.DataDir,
+		frontendDir:   opts.FrontendDir,
 		agentToken:    opts.AgentToken,
 		adminUsername: opts.AdminUsername,
 		adminPassword: opts.AdminPassword,
@@ -63,6 +74,7 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	mux.HandleFunc("/api/health", r.handleHealth)
 	mux.HandleFunc("/api/auth/login", r.handleLogin)
 	mux.HandleFunc("/api/auth/me", r.handleMe)
+	mux.HandleFunc("/api/settings", r.handleSettings)
 	mux.HandleFunc("/api/ai/chat", r.handleAIChat)
 	mux.HandleFunc("/api/agent/heartbeat", r.handleAgentHeartbeat)
 	mux.HandleFunc("/api/agent/install", r.handleAgentInstall)

@@ -23,6 +23,7 @@ export const messages = {
       servers: '被控服务器',
       tasks: '任务审计',
       ai: 'AI 运维',
+      settings: '系统设置',
     },
     route: {
       entry: '入口',
@@ -134,6 +135,7 @@ export const messages = {
       servers: 'Agent Servers',
       tasks: 'Task Audit',
       ai: 'AI Ops',
+      settings: 'System Settings',
     },
     route: {
       entry: 'Entry',

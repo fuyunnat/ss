@@ -1,6 +1,6 @@
 import type { Locale } from './i18n';
 
-export type ActiveTab = 'gateways' | 'exits' | 'policies' | 'servers' | 'tasks' | 'ai';
+export type ActiveTab = 'gateways' | 'exits' | 'policies' | 'servers' | 'tasks' | 'ai' | 'settings';
 
 export function taskTypeMeta(type: string, copyText: (zh: string, en: string) => string) {
   const map: Record<string, { label: string; desc: string; summary: string }> = {
@@ -50,6 +50,7 @@ export function panelDesc(active: ActiveTab, copyText: (zh: string, en: string) 
     servers: copyText('纳管被控服务器，安装 Agent 并上报心跳', 'Enroll controlled servers, install agents, and report heartbeat'),
     tasks: copyText('审计安装、部署、同步、检查等执行记录', 'Audit install, deploy, sync, and health-check records'),
     ai: copyText('根据服务器清单生成批量安装和运维草案', 'Draft batch installs and ops from server lists'),
+    settings: copyText('查看主控配置、安全状态和运维命令', 'View control-plane config, security status, and ops commands'),
   };
   return map[active];
 }

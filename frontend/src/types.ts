@@ -131,6 +131,25 @@ export interface AuthSession {
   username: string;
 }
 
+export interface SystemSettings {
+  httpAddr: string;
+  corsAllowOrigin: string;
+  dataDir: string;
+  frontendEnabled: boolean;
+  adminUsername: string;
+  defaultAdminPassword: boolean;
+  agentTokenConfigured: boolean;
+  aiConfigured: boolean;
+  aiBaseUrl: string;
+  aiApiKeyConfigured: boolean;
+  aiModel: string;
+  sessionSecretCustom: boolean;
+  masterConfigCommand: string;
+  agentConfigCommand: string;
+  masterServiceName: string;
+  agentServiceName: string;
+}
+
 export interface AIChatRequest {
   message: string;
 }
