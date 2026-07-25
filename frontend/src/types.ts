@@ -44,12 +44,45 @@ export interface ExitNode {
   address: string;
   port: number;
   username: string;
+  shareLink?: string;
+  settings?: ProtocolNodeSettings;
   region: string;
   weight: number;
   enabled: boolean;
   health: string;
   latencyMs: number;
   failureRate: number;
+}
+
+export interface ProtocolNodeSettings {
+  core: string;
+  protocol: string;
+  listenIp: string;
+  transport: string;
+  security: string;
+  totalGb: number;
+  expiryDate: string;
+  domain: string;
+  sni: string;
+  path: string;
+  credential: string;
+  extraId: number;
+  method: string;
+  authUser: string;
+  password: string;
+  authEnabled: boolean;
+  udp: boolean;
+  flow: string;
+  realityPublicKey: string;
+  realityShortId: string;
+  fingerprint: string;
+  disableInsecureEncryption: boolean;
+  httpObfuscation: boolean;
+  tls: boolean;
+  sniffing: boolean;
+  targetAddress: string;
+  targetPort: number;
+  network: string;
 }
 
 export interface Policy {
@@ -137,6 +170,15 @@ export interface ProtocolForm {
   path: string;
   credential: string;
   extraId: number;
+  method: string;
+  authUser: string;
+  password: string;
+  authEnabled: boolean;
+  udp: boolean;
+  flow: string;
+  realityPublicKey: string;
+  realityShortId: string;
+  fingerprint: string;
   disableInsecureEncryption: boolean;
   httpObfuscation: boolean;
   tls: boolean;

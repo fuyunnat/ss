@@ -145,10 +145,31 @@
   background: #f8fbff;
 }
 
+.protocol-section-title {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 2px;
+}
+
+.protocol-section-title strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.protocol-section-title span {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .toggle-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 7px;
+}
+
+.toggle-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .toggle-field {
@@ -225,6 +246,90 @@
   margin-bottom: 8px;
 }
 
+.link-preview {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.link-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.link-preview-head > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.link-preview-head span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.link-preview-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-row-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.link-row-grid span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid #dce3ea;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+}
+
+.link-row-grid b,
+.link-row-grid span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-row-grid b {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.link-preview code {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px;
+  overflow-x: auto;
+  border-radius: 7px;
+  background: #0f172a;
+  color: #bfdbfe;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
 .advanced-side summary {
   cursor: pointer;
   color: #334155;
@@ -276,6 +381,10 @@
 
 @media (max-width: 1180px) {
   .simple-path {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .link-row-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

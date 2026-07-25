@@ -43,6 +43,8 @@ type ExitNode struct {
 	Address     string    `json:"address"`
 	Port        int       `json:"port"`
 	Username    string    `json:"username"`
+	ShareLink   string    `json:"shareLink,omitempty"`
+	Settings    any       `json:"settings,omitempty"`
 	Region      string    `json:"region"`
 	Weight      int       `json:"weight"`
 	Enabled     bool      `json:"enabled"`

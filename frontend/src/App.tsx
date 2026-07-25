@@ -4,6 +4,7 @@ import {
   Activity,
   Bot,
   CheckCircle2,
+  Copy,
   Database,
   Globe2,
   Languages,
@@ -33,6 +34,7 @@ import { numberValue, panelDesc, readLocale, shortID, splitList, taskStatusLabel
 import { messages, type Locale } from './i18n';
 import { policyMatchMeta, policyMatchOptions, policyMatchSummary, policyStrategyMeta, policyStrategyOptions } from './policyOptions';
 import { createProtocolForm, protocolPresets } from './protocolDefaults';
+import { applyProtocolSettings, buildProtocolShareInfo, protocolSettingsFromForm } from './protocolLinks';
 import type { AuthSession, ExitNode, Gateway, Policy, ProtocolForm, ServerNode, Summary, Task } from './types';
 
 type ResourceKind = 'server' | 'gateway' | 'exit' | 'policy';
@@ -44,7 +46,7 @@ const emptyPolicy: Policy = { name: '', matchType: 'default', matchValue: '*', s
 const emptyTask: Task = { type: 'sync_config', status: 'queued', targetType: 'gateway', targetId: '', summary: '', logs: [] };
 const taskTypes = ['sync_config', 'health_check', 'reload_core', 'switch_core_version'];
 const taskTargets = ['gateway', 'server', 'exit'];
-const supportedExitProtocols = new Set(['vless', 'vmess', 'trojan', 'shadowsocks', 'socks5', 'dokodemo-door']);
+const supportedExitProtocols = new Set(['vless', 'vmess', 'trojan', 'shadowsocks', 'socks5', 'http', 'dokodemo-door']);
 
 function App() {
   const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
@@ -91,17 +93,7 @@ function App() {
   const selectedPolicyStrategy = policyStrategyMeta(policyForm.strategy, copyText);
   const selectedProtocolServer = servers.find((item) => item.id === protocolForm.serverId);
   const serverByID = useMemo(() => new Map(servers.map((server) => [server.id, server])), [servers]);
-  const protocolDeploySummary = [
-    `${protocolForm.core.toUpperCase()} ${protocolForm.protocol.toUpperCase()}`,
-    `${copyText('监听端口', 'listen')} ${protocolForm.port}`,
-    protocolForm.listenIp ? `${copyText('监听', 'listen IP')} ${protocolForm.listenIp}` : '',
-    protocolForm.protocol === 'dokodemo-door' ? `${copyText('目标', 'target')} ${protocolForm.targetAddress || '-'}:${protocolForm.targetPort || '-'}` : `${copyText('传输', 'transport')} ${protocolForm.transport}`,
-    protocolForm.protocol === 'dokodemo-door' ? `${copyText('网络', 'network')} ${protocolForm.network}` : `${copyText('安全', 'security')} ${protocolForm.security}`,
-    protocolForm.protocol !== 'dokodemo-door' && protocolForm.sni ? `SNI ${protocolForm.sni}` : '',
-    protocolForm.protocol !== 'dokodemo-door' && protocolForm.path && protocolForm.transport !== 'tcp' ? `path ${protocolForm.path}` : '',
-    protocolForm.totalGb > 0 ? `${copyText('流量', 'traffic')} ${protocolForm.totalGb}GB` : '',
-    protocolForm.expiryDate ? `${copyText('到期', 'expiry')} ${protocolForm.expiryDate}` : '',
-  ].filter(Boolean).join(' / ');
+  const protocolDeploySummary = buildDeploySummary(protocolForm, copyText);
 
   async function refresh() {
     if (!session) return;
@@ -234,6 +226,9 @@ function App() {
       }
       const nodeName = protocolForm.name.trim();
       const address = protocolForm.domain.trim() || selectedProtocolServer?.host || 'pending-agent';
+      const shareInfo = buildProtocolShareInfo(protocolForm, selectedProtocolServer);
+      const settings = protocolSettingsFromForm(protocolForm);
+      const username = protocolForm.protocol === 'socks5' || protocolForm.protocol === 'http' ? protocolForm.authUser : protocolForm.protocol === 'trojan' || protocolForm.protocol === 'shadowsocks' ? '' : protocolForm.credential;
       const savedExit = await api.saveExit({
         ...emptyExit,
         id: protocolForm.exitId || undefined,
@@ -242,7 +237,9 @@ function App() {
         serverId: protocolForm.serverId,
         address,
         port: protocolForm.port,
-        username: protocolForm.credential,
+        username,
+        shareLink: shareInfo.canCopy ? shareInfo.link : '',
+        settings,
         region: selectedProtocolServer?.region ?? '',
         enabled: protocolForm.enabled,
         health: 'unknown',
@@ -280,7 +277,7 @@ function App() {
       return;
     }
     const preset = protocolPresets.find((candidate) => candidate.protocol === parsed.protocol);
-    setProtocolForm({
+    const legacyForm = {
       ...createProtocolForm(),
       exitId: item.id ?? '',
       name: item.name,
@@ -295,8 +292,18 @@ function App() {
       credential: item.username,
       targetAddress: parsed.protocol === 'dokodemo-door' ? item.address : '',
       targetPort: parsed.protocol === 'dokodemo-door' ? item.port : 0,
-    } as ProtocolForm);
+    } as ProtocolForm;
+    setProtocolForm(applyProtocolSettings(legacyForm, item.settings));
     showNotice(copyText('节点已载入左侧编辑表单', 'Node loaded into the left edit form'));
+  }
+
+  async function copyNodeText(text?: string) {
+    if (!text) {
+      showNotice(copyText('该节点缺少链接参数，请编辑后更新', 'This node is missing link parameters; edit and update it first'));
+      return;
+    }
+    await navigator.clipboard?.writeText(text);
+    showNotice(copyText('链接已复制', 'Link copied'));
   }
 
   async function copyInstallCommand() {
@@ -410,6 +417,7 @@ function App() {
                   onChange={setProtocolForm}
                   onSubmit={deployProtocolNode}
                   onReset={() => setProtocolForm(createProtocolForm())}
+                  onCopyLink={copyNodeText}
                 />
                 <details className="sub-panel advanced-side">
                   <summary>{copyText('高级：接入第三方代理', 'Advanced: attach external proxy')}</summary>
@@ -531,6 +539,7 @@ function App() {
                   const endpoint = `${item.address}:${item.port}`;
                   return <DataRow key={item.id} title={item.name} detail={`${serverText} | ${item.type} | ${endpoint} | ${item.region || '-'} | weight ${item.weight}`} status={item.health || endpoint} good={item.health === 'healthy'} actions={<>
                     <IconButton label={t.actions.edit} onClick={() => editExit(item)} icon={Pencil} />
+                    <IconButton label={copyText('复制链接', 'Copy Link')} onClick={() => copyNodeText(item.shareLink)} icon={Copy} disabled={!item.shareLink} />
                     <IconButton label={t.actions.queueHealth} onClick={() => queueTask('health_check', 'exit', item.id ?? '', `${t.actions.queueHealth}: ${item.name}`)} icon={ShieldCheck} />
                     <IconButton danger label={t.actions.delete} onClick={() => removeItem('exit', item.id)} icon={Trash2} />
                   </>} />;
@@ -587,6 +596,40 @@ function DataRow({ title, detail, status, good = false, actions }: { title: stri
 
 function IconButton({ label, onClick, icon: Icon, danger = false, disabled = false }: { label: string; onClick: () => void; icon: LucideIcon; danger?: boolean; disabled?: boolean }) {
   return <button className={`icon-button ${danger ? 'danger' : ''}`} type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick}><Icon size={15} /></button>;
+}
+
+function buildDeploySummary(form: ProtocolForm, copyText: (zh: string, en: string) => string) {
+  const base = [
+    `${form.core.toUpperCase()} ${form.protocol.toUpperCase()}`,
+    `${copyText('监听端口', 'listen')} ${form.port}`,
+    form.listenIp ? `${copyText('监听', 'listen IP')} ${form.listenIp}` : '',
+  ];
+  const limits = [
+    form.totalGb > 0 ? `${copyText('流量', 'traffic')} ${form.totalGb}GB` : '',
+    form.expiryDate ? `${copyText('到期', 'expiry')} ${form.expiryDate}` : '',
+  ];
+
+  if (form.protocol === 'dokodemo-door') {
+    return [...base, `${copyText('目标', 'target')} ${form.targetAddress || '-'}:${form.targetPort || '-'}`, `${copyText('网络', 'network')} ${form.network}`, ...limits].filter(Boolean).join(' / ');
+  }
+  if (form.protocol === 'shadowsocks') {
+    return [...base, `${copyText('加密', 'method')} ${form.method}`, `${copyText('网络', 'network')} ${form.network}`, ...limits].filter(Boolean).join(' / ');
+  }
+  if (form.protocol === 'socks5') {
+    return [...base, form.authEnabled ? copyText('账号密码认证', 'password auth') : copyText('无认证', 'no auth'), `UDP ${form.udp ? copyText('开启', 'on') : copyText('关闭', 'off')}`, ...limits].filter(Boolean).join(' / ');
+  }
+  if (form.protocol === 'http') {
+    return [...base, copyText('HTTP 账号密码认证', 'HTTP password auth'), ...limits].filter(Boolean).join(' / ');
+  }
+
+  return [
+    ...base,
+    `${copyText('传输', 'transport')} ${form.transport}`,
+    `${copyText('安全', 'security')} ${form.security}`,
+    form.security !== 'none' && form.sni ? `SNI ${form.sni}` : '',
+    form.path && form.transport !== 'tcp' ? `path ${form.path}` : '',
+    ...limits,
+  ].filter(Boolean).join(' / ');
 }
 
 export default App;

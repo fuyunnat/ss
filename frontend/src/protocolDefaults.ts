@@ -7,6 +7,7 @@ export const protocolPresets: ProtocolPreset[] = [
   { protocol: 'trojan', core: 'xray', security: 'tls', transport: 'tcp', port: 443, label: 'Trojan TLS', hint: '稳定' },
   { protocol: 'shadowsocks', core: 'sing-box', security: 'none', transport: 'tcp', port: 8388, label: 'Shadowsocks', hint: '轻量' },
   { protocol: 'socks5', core: 'sing-box', security: 'none', transport: 'tcp', port: 1080, label: 'SOCKS5', hint: '内网' },
+  { protocol: 'http', core: 'sing-box', security: 'none', transport: 'tcp', port: 8080, label: 'HTTP Proxy', hint: '浏览器' },
   { protocol: 'dokodemo-door', core: 'xray', security: 'none', transport: 'tcp+udp', port: 50580, label: 'Dokodemo Door', hint: '转发' },
 ];
 
@@ -29,6 +30,15 @@ export function createProtocolForm(): ProtocolForm {
     path: '/',
     credential: defaultCredential(),
     extraId: 0,
+    method: 'aes-128-gcm',
+    authUser: 'proxy',
+    password: defaultPassword(),
+    authEnabled: true,
+    udp: true,
+    flow: '',
+    realityPublicKey: '',
+    realityShortId: '',
+    fingerprint: 'chrome',
     disableInsecureEncryption: false,
     httpObfuscation: false,
     tls: false,
@@ -41,4 +51,9 @@ export function createProtocolForm(): ProtocolForm {
 
 function defaultCredential() {
   return globalThis.crypto?.randomUUID?.() ?? '00000000-0000-4000-8000-000000000000';
+}
+
+function defaultPassword() {
+  const source = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  return source.replace(/-/g, '').slice(0, 18);
 }
