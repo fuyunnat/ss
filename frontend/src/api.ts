@@ -1,4 +1,4 @@
-import type { AdminCredentialsUpdate, AgentInstallRequest, AIChatRequest, AIChatResponse, AISettingsUpdate, AuthSession, ConsoleSettingsUpdate, ExitNode, Gateway, Policy, ServerNode, Summary, SystemSettings, Task } from './types';
+import type { AdminCredentialsUpdate, AgentInstallRequest, AgentSettingsUpdate, AIChatRequest, AIChatResponse, AISettingsUpdate, AuthSession, ConsoleSettingsUpdate, ExitNode, Gateway, Policy, ServerNode, Summary, SystemSettings, Task } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const SESSION_KEY = 'proxy-control-session';
@@ -59,6 +59,7 @@ export const api = {
   updateConsoleSettings: (payload: ConsoleSettingsUpdate) => request<SystemSettings>('/api/settings/console', { method: 'PUT', body: JSON.stringify(payload) }),
   updateAdminCredentials: (payload: AdminCredentialsUpdate) => request<AuthSession>('/api/settings/admin', { method: 'PUT', body: JSON.stringify(payload) }),
   updateAISettings: (payload: AISettingsUpdate) => request<SystemSettings>('/api/settings/ai', { method: 'PUT', body: JSON.stringify(payload) }),
+  updateAgentSettings: (payload: AgentSettingsUpdate) => request<SystemSettings>('/api/settings/agent', { method: 'PUT', body: JSON.stringify(payload) }),
 
   summary: () => request<Summary>('/api/summary'),
   servers: () => request<ServerNode[]>('/api/servers'),

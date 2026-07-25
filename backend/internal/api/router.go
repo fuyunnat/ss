@@ -32,7 +32,11 @@ type Router struct {
 	corsOrigin          string
 	dataDir             string
 	frontendDir         string
+	agentMu             sync.RWMutex
 	agentToken          string
+	agentMasterURL      string
+	agentMasterService  string
+	agentService        string
 	authMu              sync.RWMutex
 	adminUsername       string
 	adminPassword       string
@@ -95,6 +99,22 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 			aiModel = "gpt-4o-mini"
 		}
 	}
+	agentToken := strings.TrimSpace(opts.AgentToken)
+	agentMasterURL := ""
+	agentMasterService := "proxy-control"
+	agentService := "proxy-control-agent"
+	if agentConfig, ok := st.AgentConfig(); ok {
+		if strings.TrimSpace(agentConfig.Token) != "" {
+			agentToken = strings.TrimSpace(agentConfig.Token)
+		}
+		agentMasterURL = strings.TrimRight(strings.TrimSpace(agentConfig.MasterURL), "/")
+		if strings.TrimSpace(agentConfig.MasterServiceName) != "" {
+			agentMasterService = strings.TrimSpace(agentConfig.MasterServiceName)
+		}
+		if strings.TrimSpace(agentConfig.AgentServiceName) != "" {
+			agentService = strings.TrimSpace(agentConfig.AgentServiceName)
+		}
+	}
 
 	r := &Router{
 		store:               st,
@@ -102,7 +122,10 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 		corsOrigin:          corsOrigin,
 		dataDir:             opts.DataDir,
 		frontendDir:         frontendDir,
-		agentToken:          opts.AgentToken,
+		agentToken:          agentToken,
+		agentMasterURL:      agentMasterURL,
+		agentMasterService:  agentMasterService,
+		agentService:        agentService,
 		adminUsername:       adminUsername,
 		adminPassword:       adminPassword,
 		adminHash:           adminHash,
@@ -124,6 +147,7 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	mux.HandleFunc("/api/settings/console", r.handleConsoleSettings)
 	mux.HandleFunc("/api/settings/admin", r.handleAdminSettings)
 	mux.HandleFunc("/api/settings/ai", r.handleAISettings)
+	mux.HandleFunc("/api/settings/agent", r.handleAgentSettings)
 	mux.HandleFunc("/api/ai/chat", r.handleAIChat)
 	mux.HandleFunc("/api/agent/heartbeat", r.handleAgentHeartbeat)
 	mux.HandleFunc("/api/agent/install", r.handleAgentInstall)
@@ -163,7 +187,8 @@ func (r *Router) handleAgentHeartbeat(w http.ResponseWriter, req *http.Request) 
 		methodNotAllowed(w)
 		return
 	}
-	if r.agentToken != "" && req.Header.Get("Authorization") != "Bearer "+r.agentToken {
+	agentConfig := r.agentConfigSnapshot()
+	if agentConfig.Token != "" && req.Header.Get("Authorization") != "Bearer "+agentConfig.Token {
 		writeError(w, http.StatusUnauthorized, "agent token is invalid")
 		return
 	}

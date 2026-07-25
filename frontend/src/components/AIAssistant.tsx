@@ -1,37 +1,45 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Bot, Play, Send, ServerCog, Sparkles } from 'lucide-react';
 import { api } from '../api';
-import type { AgentInstallRequest, AIAction, AIChatResponse } from '../types';
+import type { AgentInstallRequest, AIAction, AIChatResponse, SystemSettings } from '../types';
 import { CustomSelect, Field } from './ui';
 
 interface AIAssistantProps {
   copyText: (zh: string, en: string) => string;
+  settings: SystemSettings | null;
   onError: (message: string) => void;
   onNotice: (message: string) => void;
   onRefresh: () => Promise<void>;
 }
 
-const defaultBatchDefaults: AgentInstallRequest = {
-  sshHost: '',
-  sshPort: 22,
-  sshUser: 'root',
-  authMethod: 'agent',
-  sshPassword: '',
-  privateKey: '',
-  masterUrl: 'http://YOUR-MASTER:8080',
-  agentToken: '',
-  nodeName: '',
-  region: '',
-  nodeHost: '',
-};
+function createBatchDefaults(settings?: SystemSettings | null): AgentInstallRequest {
+  return {
+    sshHost: '',
+    sshPort: 22,
+    sshUser: 'root',
+    authMethod: 'agent',
+    sshPassword: '',
+    privateKey: '',
+    masterUrl: settings?.agentMasterUrl || '',
+    agentToken: '',
+    nodeName: '',
+    region: '',
+    nodeHost: '',
+  };
+}
 
-export function AIAssistant({ copyText, onError, onNotice, onRefresh }: AIAssistantProps) {
+export function AIAssistant({ copyText, settings, onError, onNotice, onRefresh }: AIAssistantProps) {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [response, setResponse] = useState<AIChatResponse | null>(null);
-  const [batchDefaults, setBatchDefaults] = useState<AgentInstallRequest>(defaultBatchDefaults);
+  const [batchDefaults, setBatchDefaults] = useState<AgentInstallRequest>(() => createBatchDefaults(settings));
   const updateDefaults = (patch: Partial<AgentInstallRequest>) => setBatchDefaults((current) => ({ ...current, ...patch }));
+
+  useEffect(() => {
+    if (!settings?.agentMasterUrl) return;
+    setBatchDefaults((current) => ({ ...current, masterUrl: current.masterUrl || settings.agentMasterUrl }));
+  }, [settings?.agentMasterUrl]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -51,8 +59,8 @@ export function AIAssistant({ copyText, onError, onNotice, onRefresh }: AIAssist
   async function executeInstallActions() {
     const actions = response?.actions.filter((item) => item.type === 'install_agent') ?? [];
     if (actions.length === 0) return;
-    if (!batchDefaults.masterUrl || !batchDefaults.agentToken) {
-      onError(copyText('先填写总控地址和 Agent Token，才能批量安装', 'Fill master URL and agent token before batch install'));
+    if (!batchDefaults.masterUrl || !settings?.agentTokenConfigured) {
+      onError(copyText('先到系统设置保存总控地址和 Agent Token，才能批量安装', 'Save the master URL and agent token in system settings before batch install'));
       return;
     }
     setExecuting(true);
@@ -104,7 +112,7 @@ export function AIAssistant({ copyText, onError, onNotice, onRefresh }: AIAssist
           </div>
           <div className="form-row">
             <Field label={copyText('总控地址', 'Master URL')}><input value={batchDefaults.masterUrl} onChange={(event) => updateDefaults({ masterUrl: event.target.value })} placeholder="http://master.example.com:8080" /></Field>
-            <Field label="Agent Token"><input value={batchDefaults.agentToken} onChange={(event) => updateDefaults({ agentToken: event.target.value })} type="password" placeholder={copyText('后端 PROXY_CONTROL_AGENT_TOKEN', 'Backend PROXY_CONTROL_AGENT_TOKEN')} /></Field>
+            <Field label={copyText('接入 Token', 'Access Token')}><input value={settings?.agentTokenConfigured ? copyText('已在系统设置配置，执行时自动使用', 'Configured in system settings and used automatically') : copyText('未配置，请到系统设置保存 Token', 'Missing; save token in system settings')} readOnly disabled /></Field>
           </div>
           <div className="form-row three">
             <Field label={copyText('默认 SSH 用户', 'Default SSH User')}><input value={batchDefaults.sshUser} onChange={(event) => updateDefaults({ sshUser: event.target.value })} /></Field>

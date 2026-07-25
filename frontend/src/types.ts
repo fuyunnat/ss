@@ -145,6 +145,7 @@ export interface SystemSettings {
   adminUsername: string;
   defaultAdminPassword: boolean;
   agentTokenConfigured: boolean;
+  agentMasterUrl: string;
   aiConfigured: boolean;
   aiBaseUrl: string;
   aiApiKeyConfigured: boolean;
@@ -172,6 +173,13 @@ export interface AISettingsUpdate {
   baseUrl: string;
   apiKey: string;
   model: string;
+}
+
+export interface AgentSettingsUpdate {
+  masterUrl: string;
+  agentToken: string;
+  masterServiceName: string;
+  agentServiceName: string;
 }
 
 export interface AIChatRequest {

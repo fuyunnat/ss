@@ -100,6 +100,7 @@ type State struct {
 	Admin    *AdminConfig   `json:"admin,omitempty"`
 	AI       *AIConfig      `json:"ai,omitempty"`
 	Console  *ConsoleConfig `json:"console,omitempty"`
+	Agent    *AgentConfig   `json:"agent,omitempty"`
 }
 
 type Summary struct {
@@ -131,4 +132,12 @@ type ConsoleConfig struct {
 	CORSAllowOrigin string    `json:"corsAllowOrigin"`
 	FrontendDir     string    `json:"frontendDir"`
 	UpdatedAt       time.Time `json:"updatedAt"`
+}
+
+type AgentConfig struct {
+	Token             string    `json:"token,omitempty"`
+	MasterURL         string    `json:"masterUrl"`
+	MasterServiceName string    `json:"masterServiceName"`
+	AgentServiceName  string    `json:"agentServiceName"`
+	UpdatedAt         time.Time `json:"updatedAt"`
 }

@@ -82,8 +82,8 @@ func (r *Router) handleAIChat(w http.ResponseWriter, req *http.Request) {
 	if len(actions) > 0 && !aiConfig.configured() {
 		writeJSON(w, http.StatusOK, aiChatResponse{
 			Configured: false,
-			Reply:      fmt.Sprintf("已从你的描述里识别出 %d 台待安装服务器。补齐总控地址、Agent Token 和 SSH 认证方式后，可以在右侧确认批量安装。", len(actions)),
-			Plan:       []string{"检查识别出来的服务器 IP、SSH 用户、端口和地区", "填写批量安装默认参数", "确认后由总控逐台创建安装任务", "安装完成后等待 Agent 心跳自动上线"},
+			Reply:      fmt.Sprintf("已从你的描述里识别出 %d 台待安装服务器。系统设置里保存被控接入信息后，可以在右侧确认批量安装。", len(actions)),
+			Plan:       []string{"检查识别出来的服务器 IP、SSH 用户、端口和地区", "确认系统设置已保存总控地址和 Agent Token", "确认后由总控逐台创建安装任务", "安装完成后等待 Agent 心跳自动上线"},
 			Actions:    actions,
 		})
 		return
@@ -323,7 +323,7 @@ func inferActionsFromMessage(message string) []aiAction {
 			Title:                "安装被控 Agent: " + target.NodeName,
 			Description:          fmt.Sprintf("%s@%s:%d，地区 %s", target.SSHUser, target.SSHHost, target.SSHPort, aiDefaultString(target.Region, "未指定")),
 			Payload:              payload,
-			MissingFields:        []string{"masterUrl", "agentToken"},
+			MissingFields:        []string{"masterUrl"},
 			RequiresConfirmation: true,
 		})
 	}

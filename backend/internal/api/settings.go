@@ -20,6 +20,7 @@ type settingsResponse struct {
 	AdminUsername        string `json:"adminUsername"`
 	DefaultAdminPassword bool   `json:"defaultAdminPassword"`
 	AgentTokenConfigured bool   `json:"agentTokenConfigured"`
+	AgentMasterURL       string `json:"agentMasterUrl"`
 	AIConfigured         bool   `json:"aiConfigured"`
 	AIBaseURL            string `json:"aiBaseUrl"`
 	AIAPIKeyConfigured   bool   `json:"aiApiKeyConfigured"`
@@ -49,6 +50,13 @@ type consoleSettingsRequest struct {
 	FrontendDir     string `json:"frontendDir"`
 }
 
+type agentSettingsRequest struct {
+	MasterURL         string `json:"masterUrl"`
+	AgentToken        string `json:"agentToken"`
+	MasterServiceName string `json:"masterServiceName"`
+	AgentServiceName  string `json:"agentServiceName"`
+}
+
 func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -57,6 +65,7 @@ func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 	adminUsername, defaultAdminPassword := r.adminSettingsSummary()
 	consoleConfig := r.consoleConfigSnapshot()
 	aiConfig := r.aiConfigSnapshot()
+	agentConfig := r.agentConfigSnapshot()
 
 	writeJSON(w, http.StatusOK, settingsResponse{
 		HTTPAddr:             consoleConfig.HTTPAddr,
@@ -66,7 +75,8 @@ func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 		FrontendEnabled:      consoleConfig.FrontendDir != "",
 		AdminUsername:        adminUsername,
 		DefaultAdminPassword: defaultAdminPassword,
-		AgentTokenConfigured: r.agentToken != "",
+		AgentTokenConfigured: agentConfig.Token != "",
+		AgentMasterURL:       agentConfig.MasterURL,
 		AIConfigured:         aiConfig.configured(),
 		AIBaseURL:            aiConfig.BaseURL,
 		AIAPIKeyConfigured:   aiConfig.APIKey != "",
@@ -74,8 +84,8 @@ func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 		AIModel:              aiConfig.Model,
 		MasterConfigCommand:  "fyss",
 		AgentConfigCommand:   "fyss",
-		MasterServiceName:    "proxy-control",
-		AgentServiceName:     "proxy-control-agent",
+		MasterServiceName:    agentConfig.MasterServiceName,
+		AgentServiceName:     agentConfig.AgentServiceName,
 	})
 }
 
@@ -139,6 +149,107 @@ func (r *Router) handleConsoleSettings(w http.ResponseWriter, req *http.Request)
 		FrontendDir:     next.FrontendDir,
 		FrontendEnabled: next.FrontendDir != "",
 	})
+}
+
+func (r *Router) agentConfigSnapshot() store.AgentConfig {
+	r.agentMu.RLock()
+	defer r.agentMu.RUnlock()
+
+	return store.AgentConfig{
+		Token:             strings.TrimSpace(r.agentToken),
+		MasterURL:         strings.TrimRight(strings.TrimSpace(r.agentMasterURL), "/"),
+		MasterServiceName: defaultString(strings.TrimSpace(r.agentMasterService), "proxy-control"),
+		AgentServiceName:  defaultString(strings.TrimSpace(r.agentService), "proxy-control-agent"),
+	}
+}
+
+func (r *Router) handleAgentSettings(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPut {
+		methodNotAllowed(w)
+		return
+	}
+
+	var input agentSettingsRequest
+	if !decodeJSON(w, req, &input) {
+		return
+	}
+	masterURL := strings.TrimRight(strings.TrimSpace(input.MasterURL), "/")
+	agentToken := strings.TrimSpace(input.AgentToken)
+	masterServiceName := defaultString(strings.TrimSpace(input.MasterServiceName), "proxy-control")
+	agentServiceName := defaultString(strings.TrimSpace(input.AgentServiceName), "proxy-control-agent")
+	if err := validateAgentMasterURL(masterURL); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateServiceName(masterServiceName, "主控服务名"); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateServiceName(agentServiceName, "被控服务名"); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if agentToken != "" && hasControlChar(agentToken) {
+		writeError(w, http.StatusBadRequest, "Agent Token 不能包含换行或控制字符")
+		return
+	}
+
+	current := r.agentConfigSnapshot()
+	if agentToken == "" {
+		agentToken = current.Token
+	}
+	next := store.AgentConfig{
+		Token:             agentToken,
+		MasterURL:         masterURL,
+		MasterServiceName: masterServiceName,
+		AgentServiceName:  agentServiceName,
+	}
+	if err := r.store.SaveAgentConfig(next); err != nil {
+		writeError(w, http.StatusInternalServerError, "保存被控接入配置失败")
+		return
+	}
+
+	r.agentMu.Lock()
+	r.agentToken = next.Token
+	r.agentMasterURL = next.MasterURL
+	r.agentMasterService = next.MasterServiceName
+	r.agentService = next.AgentServiceName
+	r.agentMu.Unlock()
+
+	writeJSON(w, http.StatusOK, settingsResponse{
+		AgentTokenConfigured: next.Token != "",
+		AgentMasterURL:       next.MasterURL,
+		MasterServiceName:    next.MasterServiceName,
+		AgentServiceName:     next.AgentServiceName,
+	})
+}
+
+func validateAgentMasterURL(value string) error {
+	if value == "" {
+		return nil
+	}
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return errors.New("总控地址必须是 http 或 https URL，或留空")
+	}
+	return nil
+}
+
+func validateServiceName(value string, label string) error {
+	if value == "" {
+		return errors.New(label + "不能为空")
+	}
+	if len(value) > 80 || hasControlChar(value) || strings.ContainsAny(value, " \t\r\n/\\") {
+		return errors.New(label + "只能使用不含空格的 systemd 服务名")
+	}
+	return nil
+}
+
+func defaultString(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func validateHTTPAddr(value string) error {

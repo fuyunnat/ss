@@ -173,6 +173,115 @@ func TestAgentInstallRejectsMismatchedToken(t *testing.T) {
 	}
 }
 
+func TestAgentSettingsPersistAndDriveHeartbeatAuth(t *testing.T) {
+	path := t.TempDir() + "/state.json"
+	st, err := store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/agent", strings.NewReader(`{
+		"masterUrl":"https://master.example.com:8443/",
+		"agentToken":"agent-secret",
+		"masterServiceName":"fyss-master",
+		"agentServiceName":"fyss-agent"
+	}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected update status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if strings.Contains(res.Body.String(), "agent-secret") {
+		t.Fatalf("agent settings update leaked token: %s", res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	authorize(req, token)
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected settings status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	if strings.Contains(body, "agent-secret") {
+		t.Fatalf("settings leaked agent token: %s", body)
+	}
+	for _, want := range []string{`"agentTokenConfigured":true`, `"agentMasterUrl":"https://master.example.com:8443"`, `"masterServiceName":"fyss-master"`, `"agentServiceName":"fyss-agent"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected settings response to contain %s, got %s", want, body)
+		}
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/agent/heartbeat", strings.NewReader(`{"name":"hk-01","host":"203.0.113.1"}`))
+	req.Header.Set("Authorization", "Bearer wrong")
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected wrong agent token status 401, got %d: %s", res.Code, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/agent/heartbeat", strings.NewReader(`{"name":"hk-01","host":"203.0.113.1"}`))
+	req.Header.Set("Authorization", "Bearer agent-secret")
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected heartbeat status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	reopened, err := store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("reopen store: %v", err)
+	}
+	agentConfig, ok := reopened.AgentConfig()
+	if !ok || agentConfig.Token != "agent-secret" || agentConfig.MasterURL != "https://master.example.com:8443" || agentConfig.AgentServiceName != "fyss-agent" {
+		t.Fatalf("unexpected persisted agent config: ok=%v config=%+v", ok, agentConfig)
+	}
+}
+
+func TestAgentSettingsRejectInvalidValues(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	for _, body := range []string{
+		`{"masterUrl":"ftp://master.example.com","agentToken":"secret","masterServiceName":"proxy-control","agentServiceName":"proxy-control-agent"}`,
+		`{"masterUrl":"https://master.example.com","agentToken":"secret","masterServiceName":"bad name","agentServiceName":"proxy-control-agent"}`,
+		"{\"masterUrl\":\"https://master.example.com\",\"agentToken\":\"bad\nsecret\",\"masterServiceName\":\"proxy-control\",\"agentServiceName\":\"proxy-control-agent\"}",
+	} {
+		req := httptest.NewRequest(http.MethodPut, "/api/settings/agent", strings.NewReader(body))
+		authorize(req, token)
+		res := httptest.NewRecorder()
+		router.ServeHTTP(res, req)
+		if res.Code != http.StatusBadRequest {
+			t.Fatalf("expected invalid agent config status 400, got %d: %s", res.Code, res.Body.String())
+		}
+	}
+}
+
+func TestAgentInstallDefaultsUseConfiguredAccess(t *testing.T) {
+	input := agentInstallRequest{
+		SSHHost:    "203.0.113.10",
+		SSHUser:    "root",
+		AuthMethod: "agent",
+		NodeName:   "hk-01",
+	}
+	normalizeAgentInstall(&input)
+	applyAgentInstallDefaults(&input, store.AgentConfig{
+		Token:     "agent-secret",
+		MasterURL: "https://master.example.com:8443",
+	})
+	if err := validateAgentInstall(input, "agent-secret"); err != nil {
+		t.Fatalf("expected configured defaults to validate: %v", err)
+	}
+	if input.AgentToken != "agent-secret" || input.MasterURL != "https://master.example.com:8443" {
+		t.Fatalf("expected install defaults to be applied: %+v", input)
+	}
+}
+
 func TestBuildSSHCommandDoesNotPutPasswordInArgs(t *testing.T) {
 	command, args, err := buildSSHCommand(agentInstallRequest{
 		SSHHost:     "203.0.113.10",

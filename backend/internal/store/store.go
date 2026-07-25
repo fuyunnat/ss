@@ -104,6 +104,25 @@ func (s *FileStore) SaveConsoleConfig(input ConsoleConfig) error {
 	return s.saveLocked()
 }
 
+func (s *FileStore) AgentConfig() (AgentConfig, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.state.Agent == nil || (s.state.Agent.Token == "" && s.state.Agent.MasterURL == "" && s.state.Agent.MasterServiceName == "" && s.state.Agent.AgentServiceName == "") {
+		return AgentConfig{}, false
+	}
+	return *s.state.Agent, true
+}
+
+func (s *FileStore) SaveAgentConfig(input AgentConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	input.UpdatedAt = time.Now().UTC()
+	s.state.Agent = &input
+	return s.saveLocked()
+}
+
 func (s *FileStore) ListServers() []ServerNode {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

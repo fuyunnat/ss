@@ -50,7 +50,9 @@ func (r *Router) handleAgentInstall(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	normalizeAgentInstall(&input)
-	if err := validateAgentInstall(input, r.agentToken); err != nil {
+	agentConfig := r.agentConfigSnapshot()
+	applyAgentInstallDefaults(&input, agentConfig)
+	if err := validateAgentInstall(input, agentConfig.Token); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -103,6 +105,15 @@ func normalizeAgentInstall(input *agentInstallRequest) {
 	input.NodeHost = strings.TrimSpace(input.NodeHost)
 	if input.AuthMethod == "" {
 		input.AuthMethod = "agent"
+	}
+}
+
+func applyAgentInstallDefaults(input *agentInstallRequest, agentConfig store.AgentConfig) {
+	if input.MasterURL == "" {
+		input.MasterURL = strings.TrimRight(strings.TrimSpace(agentConfig.MasterURL), "/")
+	}
+	if input.AgentToken == "" {
+		input.AgentToken = strings.TrimSpace(agentConfig.Token)
 	}
 }
 

@@ -522,6 +522,7 @@ function App() {
               <AgentAutoOnline
                 copyText={copyText}
                 installCommand={installCommand}
+                settings={settings}
                 onCopied={copyInstallCommand}
                 onInstalled={refresh}
                 onNotice={showNotice}
@@ -556,7 +557,7 @@ function App() {
             )}
 
             {active === 'ai' && (
-              <AIAssistant copyText={copyText} onError={setError} onNotice={showNotice} onRefresh={refresh} />
+              <AIAssistant copyText={copyText} settings={settings} onError={setError} onNotice={showNotice} onRefresh={refresh} />
             )}
 
             {active === 'settings' && (

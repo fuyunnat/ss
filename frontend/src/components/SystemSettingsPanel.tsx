@@ -24,6 +24,14 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
   const [aiForm, setAIForm] = useState({ baseUrl: settings?.aiBaseUrl || '', apiKey: '', model: settings?.aiModel || 'gpt-4o-mini' });
   const [aiSaving, setAISaving] = useState(false);
   const [aiError, setAIError] = useState('');
+  const [agentForm, setAgentForm] = useState({
+    masterUrl: settings?.agentMasterUrl || '',
+    agentToken: '',
+    masterServiceName: settings?.masterServiceName || 'proxy-control',
+    agentServiceName: settings?.agentServiceName || 'proxy-control-agent',
+  });
+  const [agentSaving, setAgentSaving] = useState(false);
+  const [agentError, setAgentError] = useState('');
 
   useEffect(() => {
     setConsoleForm({
@@ -44,6 +52,15 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
       model: settings?.aiModel || current.model || 'gpt-4o-mini',
     }));
   }, [settings?.aiBaseUrl, settings?.aiModel]);
+
+  useEffect(() => {
+    setAgentForm((current) => ({
+      ...current,
+      masterUrl: settings?.agentMasterUrl || '',
+      masterServiceName: settings?.masterServiceName || current.masterServiceName || 'proxy-control',
+      agentServiceName: settings?.agentServiceName || current.agentServiceName || 'proxy-control-agent',
+    }));
+  }, [settings?.agentMasterUrl, settings?.agentServiceName, settings?.masterServiceName]);
 
   async function copy(text: string) {
     await navigator.clipboard?.writeText(text);
@@ -115,6 +132,27 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
     }
   }
 
+  async function saveAgent(event: FormEvent) {
+    event.preventDefault();
+    setAgentError('');
+    setAgentSaving(true);
+    try {
+      await api.updateAgentSettings({
+        masterUrl: agentForm.masterUrl.trim(),
+        agentToken: agentForm.agentToken.trim(),
+        masterServiceName: agentForm.masterServiceName.trim() || 'proxy-control',
+        agentServiceName: agentForm.agentServiceName.trim() || 'proxy-control-agent',
+      });
+      setAgentForm((current) => ({ ...current, agentToken: '' }));
+      await onRefresh();
+      onNotice(copyText('被控接入配置已保存', 'Agent access settings saved'));
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : copyText('保存失败', 'Save failed'));
+    } finally {
+      setAgentSaving(false);
+    }
+  }
+
   const masterCommand = settings?.masterConfigCommand || 'fyss';
   const agentCommand = settings?.agentConfigCommand || 'fyss';
 
@@ -150,6 +188,7 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
           status={!loaded ? copyText('读取中', 'Loading') : settings?.agentTokenConfigured ? copyText('Token 已配置', 'Token configured') : copyText('未配置 Token', 'Token missing')}
           good={loaded && settings?.agentTokenConfigured}
           rows={[
+            [copyText('总控地址', 'Master URL'), settings?.agentMasterUrl || copyText('未配置', 'Not configured')],
             ['Agent Token', settings?.agentTokenConfigured ? copyText('已配置，不回显密钥', 'Configured, secret hidden') : copyText('未配置', 'Missing')],
             [copyText('主控服务', 'Master Service'), settings?.masterServiceName || 'proxy-control'],
             [copyText('被控服务', 'Agent Service'), settings?.agentServiceName || 'proxy-control-agent'],
@@ -196,6 +235,37 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
         <div className="admin-form-footer">
           <span>{consoleError || copyText('CORS 立即生效；监听地址和前端托管目录保存后重启主控生效。', 'CORS applies immediately; listen address and frontend directory apply after master restart.')}</span>
           <button className="primary-button compact" type="submit" disabled={!loaded || consoleSaving}><Save size={15} />{consoleSaving ? copyText('保存中', 'Saving') : copyText('保存控制台配置', 'Save Console Config')}</button>
+        </div>
+      </form>
+
+      <form className="admin-credentials agent-credentials" onSubmit={saveAgent}>
+        <div className="sub-panel-head">
+          <div>
+            <strong>{copyText('被控接入配置', 'Agent Access Config')}</strong>
+            <span>{copyText('配置 Agent 上线需要的总控地址和接入 Token；安装被控和 AI 批量安装会自动使用。', 'Configure the master URL and agent token used by one-click and AI batch installs.')}</span>
+          </div>
+        </div>
+        <div className="admin-fields agent-fields">
+          <label className="field">
+            <span>{copyText('总控地址', 'Master URL')}</span>
+            <input value={agentForm.masterUrl} onChange={(event) => setAgentForm({ ...agentForm, masterUrl: event.target.value })} type="url" placeholder="http://master.example.com:8080" disabled={!loaded || agentSaving} />
+          </label>
+          <label className="field">
+            <span>Agent Token</span>
+            <input value={agentForm.agentToken} onChange={(event) => setAgentForm({ ...agentForm, agentToken: event.target.value })} type="password" autoComplete="off" placeholder={settings?.agentTokenConfigured ? copyText('留空保持原 Token', 'Leave blank to keep current token') : copyText('填写后保存', 'Enter token to save')} disabled={!loaded || agentSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('主控服务名', 'Master Service')}</span>
+            <input value={agentForm.masterServiceName} onChange={(event) => setAgentForm({ ...agentForm, masterServiceName: event.target.value })} required placeholder="proxy-control" disabled={!loaded || agentSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('被控服务名', 'Agent Service')}</span>
+            <input value={agentForm.agentServiceName} onChange={(event) => setAgentForm({ ...agentForm, agentServiceName: event.target.value })} required placeholder="proxy-control-agent" disabled={!loaded || agentSaving} />
+          </label>
+        </div>
+        <div className="admin-form-footer">
+          <span>{agentError || copyText('Token 保存后不回显；留空只更新总控地址和服务名。', 'Token is hidden after saving; leave blank to only update URL and service names.')}</span>
+          <button className="primary-button compact" type="submit" disabled={!loaded || agentSaving}><Save size={15} />{agentSaving ? copyText('保存中', 'Saving') : copyText('保存被控接入', 'Save Agent Access')}</button>
         </div>
       </form>
 

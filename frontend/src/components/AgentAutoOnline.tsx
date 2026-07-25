@@ -1,7 +1,7 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Clipboard, Play, ShieldCheck } from 'lucide-react';
 import { api } from '../api';
-import type { AgentInstallRequest } from '../types';
+import type { AgentInstallRequest, SystemSettings } from '../types';
 import { CustomSelect, Field } from './ui';
 
 type CopyText = (zh: string, en: string) => string;
@@ -9,30 +9,38 @@ type CopyText = (zh: string, en: string) => string;
 type AgentAutoOnlineProps = {
   copyText: CopyText;
   installCommand: string;
+  settings: SystemSettings | null;
   onCopied: () => void;
   onInstalled: () => Promise<void>;
   onNotice: (message: string) => void;
   onError: (message: string) => void;
 };
 
-const defaultInstallForm: AgentInstallRequest = {
-  sshHost: '',
-  sshPort: 22,
-  sshUser: 'root',
-  authMethod: 'agent',
-  sshPassword: '',
-  privateKey: '',
-  masterUrl: 'http://YOUR-MASTER:8080',
-  agentToken: '',
-  nodeName: '',
-  region: '',
-  nodeHost: '',
-};
+function createInstallForm(settings?: SystemSettings | null): AgentInstallRequest {
+  return {
+    sshHost: '',
+    sshPort: 22,
+    sshUser: 'root',
+    authMethod: 'agent',
+    sshPassword: '',
+    privateKey: '',
+    masterUrl: settings?.agentMasterUrl || '',
+    agentToken: '',
+    nodeName: '',
+    region: '',
+    nodeHost: '',
+  };
+}
 
-export function AgentAutoOnline({ copyText, installCommand, onCopied, onInstalled, onNotice, onError }: AgentAutoOnlineProps) {
-  const [form, setForm] = useState<AgentInstallRequest>(defaultInstallForm);
+export function AgentAutoOnline({ copyText, installCommand, settings, onCopied, onInstalled, onNotice, onError }: AgentAutoOnlineProps) {
+  const [form, setForm] = useState<AgentInstallRequest>(() => createInstallForm(settings));
   const [installing, setInstalling] = useState(false);
   const update = (patch: Partial<AgentInstallRequest>) => setForm((current) => ({ ...current, ...patch }));
+
+  useEffect(() => {
+    if (!settings?.agentMasterUrl) return;
+    setForm((current) => ({ ...current, masterUrl: current.masterUrl || settings.agentMasterUrl }));
+  }, [settings?.agentMasterUrl]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -73,8 +81,8 @@ export function AgentAutoOnline({ copyText, installCommand, onCopied, onInstalle
             <Field label={copyText('地区', 'Region')}><input value={form.region} onChange={(event) => update({ region: event.target.value })} placeholder="HK" /></Field>
           </div>
           <div className="form-row">
-            <Field label={copyText('总控地址', 'Master URL')}><input value={form.masterUrl} onChange={(event) => update({ masterUrl: event.target.value })} required placeholder="http://master.example.com:8080" /></Field>
-            <Field label={copyText('Agent Token', 'Agent Token')}><input value={form.agentToken} onChange={(event) => update({ agentToken: event.target.value })} required type="password" placeholder={copyText('后端 PROXY_CONTROL_AGENT_TOKEN', 'Backend PROXY_CONTROL_AGENT_TOKEN')} /></Field>
+            <Field label={copyText('总控地址', 'Master URL')}><input value={form.masterUrl} onChange={(event) => update({ masterUrl: event.target.value })} placeholder={settings?.agentMasterUrl ? copyText('已从系统设置带入', 'Loaded from system settings') : 'http://master.example.com:8080'} /></Field>
+            <Field label={copyText('接入 Token', 'Access Token')}><input value={settings?.agentTokenConfigured ? copyText('已在系统设置配置，安装时自动使用', 'Configured in system settings and used automatically') : copyText('未配置，请到系统设置保存 Token', 'Missing; save token in system settings')} readOnly disabled /></Field>
           </div>
           <div className="form-row">
             <Field label={copyText('认证方式', 'Auth Method')}>
@@ -99,7 +107,7 @@ export function AgentAutoOnline({ copyText, installCommand, onCopied, onInstalle
           )}
           <div className="form-actions">
             <button className="primary-button" type="submit" disabled={installing}><Play size={16} />{installing ? copyText('安装中', 'Installing') : copyText('一键安装', 'Install')}</button>
-            <button className="secondary-button" type="button" onClick={() => setForm(defaultInstallForm)}>{copyText('清空', 'Reset')}</button>
+            <button className="secondary-button" type="button" onClick={() => setForm(createInstallForm(settings))}>{copyText('清空', 'Reset')}</button>
           </div>
         </form>
 
