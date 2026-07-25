@@ -19,6 +19,7 @@ import {
   Route,
   Server,
   ShieldCheck,
+  SkipForward,
   Trash2,
   Wifi,
 } from 'lucide-react';
@@ -86,6 +87,7 @@ function App() {
   const onlineServers = servers.filter((item) => item.status === 'online').length;
   const enabledExits = exits.filter((item) => item.enabled).length;
   const taskSuccess = tasks.filter((item) => item.status === 'succeeded').length;
+  const queuedTasks = tasks.filter((item) => item.status === 'queued');
   const healthRate = summary.exitCount === 0 ? 0 : Math.round((summary.healthyExits / summary.exitCount) * 100);
   const selectedTaskType = taskTypeMeta(taskForm.type, copyText);
   const selectedTaskTarget = taskTargetLabel(taskForm.targetType, copyText);
@@ -186,10 +188,10 @@ function App() {
   async function createTask(event: FormEvent) {
     event.preventDefault();
     await withAction(async () => {
-      await api.createTask({ ...taskForm, logs: [] });
+      await createAndRunTask({ ...taskForm, logs: [] });
       setTaskForm(emptyTask);
       await refresh();
-    }, t.app.taskQueued);
+    }, t.app.runDone);
   }
 
   async function removeItem(kind: ResourceKind, id?: string) {
@@ -213,9 +215,32 @@ function App() {
 
   async function queueTask(type: string, targetType: string, targetId: string, summaryText: string) {
     await withAction(async () => {
-      await api.createTask({ type, targetType, targetId, summary: summaryText, status: 'queued', logs: [] });
+      await createAndRunTask({ type, targetType, targetId, summary: summaryText, status: 'queued', logs: [] });
       await refresh();
-    }, t.app.taskQueued);
+    }, t.app.runDone);
+  }
+
+  async function createAndRunTask(task: Task) {
+    const created = await api.createTask(task);
+    if (created.id) {
+      await api.runTask(created.id);
+    }
+    return created;
+  }
+
+  async function runQueuedTasks() {
+    if (queuedTasks.length === 0) {
+      showNotice(copyText('没有排队任务', 'No queued tasks'));
+      return;
+    }
+    await withAction(async () => {
+      for (const task of queuedTasks) {
+        if (task.id) {
+          await api.runTask(task.id);
+        }
+      }
+      await refresh();
+    }, copyText(`已执行 ${queuedTasks.length} 个排队任务`, `${queuedTasks.length} queued tasks executed`));
   }
 
   async function deployProtocolNode(event: FormEvent) {
@@ -244,7 +269,7 @@ function App() {
         enabled: protocolForm.enabled,
         health: 'unknown',
       });
-      await api.createTask({
+      await createAndRunTask({
         type: protocolForm.exitId ? 'sync_config' : 'deploy_protocol_node',
         targetType: protocolForm.serverId ? 'server' : 'exit',
         targetId: protocolForm.serverId || savedExit.id || '',
@@ -254,7 +279,7 @@ function App() {
       });
       setExitForm((current) => ({ ...current, serverId: protocolForm.serverId, name: nodeName, type: `self_${protocolForm.core}_${protocolForm.protocol}`, address, port: protocolForm.port }));
       await refresh();
-    }, t.app.taskQueued);
+    }, t.app.runDone);
   }
 
   function parseExitProtocol(item: ExitNode) {
@@ -520,7 +545,12 @@ function App() {
                 <span>{loading ? t.app.loading : activeNav.hint}</span>
                 <strong>{activeNav.label}</strong>
               </div>
-              <button className="secondary-button compact" type="button" onClick={refresh}><RefreshCcw size={15} />{t.app.refresh}</button>
+              <div className="toolbar-actions">
+                {active === 'tasks' && (
+                  <button className="secondary-button compact" type="button" disabled={queuedTasks.length === 0} onClick={runQueuedTasks}><SkipForward size={15} />{copyText(`执行排队 ${queuedTasks.length}`, `Run queued ${queuedTasks.length}`)}</button>
+                )}
+                <button className="secondary-button compact" type="button" onClick={refresh}><RefreshCcw size={15} />{t.app.refresh}</button>
+              </div>
             </div>
             {active === 'gateways' && (
               <DataTable headers={[t.common.name, t.common.endpoint, t.common.status, t.common.operations]} empty={gateways.length === 0 ? t.common.empty : ''}>

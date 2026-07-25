@@ -941,6 +941,14 @@ button:focus-visible {
   font-size: 13px;
 }
 
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
 .data-table {
   max-width: 100%;
   overflow: hidden;
