@@ -1,60 +1,65 @@
 .beginner-flow {
   display: grid;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 10px;
-  border: 1px solid #bfdbfe;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 8px 9px;
+  border: 1px solid #dce3ea;
   border-radius: 8px;
-  background: #eff6ff;
+  background: #ffffff;
 }
 
 .flow-title {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .flow-title strong {
   color: #0f172a;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.25;
 }
 
 .flow-title span {
-  max-width: 680px;
+  min-width: 0;
+  overflow: hidden;
   color: #475569;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .flow-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .flow-card {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  min-height: 64px;
-  padding: 9px;
-  border: 1px solid #dbeafe;
+  gap: 7px;
+  min-height: 44px;
+  padding: 6px 7px;
+  border: 1px solid #dce3ea;
   border-radius: 8px;
-  background: #ffffff;
+  background: #f8fbff;
 }
 
 .flow-card b {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: #dbeafe;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: #eaf2ff;
   color: #1d4ed8;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .flow-card.done b {
@@ -78,12 +83,12 @@
 
 .flow-card strong {
   color: #0f172a;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .flow-card span {
   color: #64748b;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .beginner-flow code {
@@ -99,18 +104,21 @@
 }
 
 @media (max-width: 1180px) {
+  .beginner-flow {
+    grid-template-columns: 1fr;
+  }
+
   .flow-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
-  .flow-title {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
   .flow-cards {
     grid-template-columns: 1fr;
+  }
+
+  .flow-title span {
+    white-space: normal;
   }
 }

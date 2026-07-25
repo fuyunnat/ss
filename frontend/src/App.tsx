@@ -64,11 +64,11 @@ function App() {
   const installCommand = 'curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh | sudo bash -s -- --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK';
 
   const navItems = useMemo(() => [
-    { id: 'servers' as const, label: t.nav.servers, count: summary.serverCount, icon: Server, hint: copyText('先执行安装脚本', 'Install first') },
-    { id: 'exits' as const, label: t.nav.exits, count: summary.exitCount, icon: Activity, hint: copyText('选择协议一键创建', 'One-click protocol') },
-    { id: 'gateways' as const, label: t.nav.gateways, count: summary.gatewayCount, icon: Network, hint: copyText('给客户端连接', 'Client entry') },
-    { id: 'policies' as const, label: t.nav.policies, count: summary.policyCount, icon: Route, hint: copyText('高级分流', 'Advanced routing') },
-    { id: 'tasks' as const, label: t.nav.tasks, count: summary.taskCount, icon: Play, hint: copyText('看执行结果', 'Execution result') },
+    { id: 'servers' as const, label: t.nav.servers, count: summary.serverCount, icon: Server, hint: copyText('Agent 接入', 'Agent enroll') },
+    { id: 'exits' as const, label: t.nav.exits, count: summary.exitCount, icon: Activity, hint: copyText('协议节点', 'Protocol nodes') },
+    { id: 'gateways' as const, label: t.nav.gateways, count: summary.gatewayCount, icon: Network, hint: copyText('入口监听', 'Listeners') },
+    { id: 'policies' as const, label: t.nav.policies, count: summary.policyCount, icon: Route, hint: copyText('流量调度', 'Traffic routing') },
+    { id: 'tasks' as const, label: t.nav.tasks, count: summary.taskCount, icon: Play, hint: copyText('任务审计', 'Task audit') },
   ], [copyText, summary, t]);
 
   const activeNav = navItems.find((item) => item.id === active) ?? navItems[0];
@@ -314,7 +314,7 @@ function App() {
           <HealthTile icon={Database} label={copyText('任务完成', 'Tasks Done')} value={`${taskSuccess}/${summary.taskCount}`} detail={copyText('可审计操作流', 'Auditable actions')} />
         </section>
 
-        <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''}`}>
+        <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''} ${active === 'servers' ? 'setup-mode' : ''}`}>
           <section className="config-panel">
             <PanelHeader icon={activeNav.icon} title={activeNav.label} desc={panelDesc(active, copyText)} />
             {active === 'gateways' && (
@@ -335,7 +335,6 @@ function App() {
                 <ProtocolBuilder
                   copyText={copyText}
                   form={protocolForm}
-                  installCommand={installCommand}
                   presets={protocolPresets}
                   servers={servers}
                   summary={protocolDeploySummary}
@@ -536,11 +535,11 @@ function taskTargetLabel(target: string, copyText: (zh: string, en: string) => s
 
 function panelDesc(active: ActiveTab, copyText: (zh: string, en: string) => string) {
   const map: Record<ActiveTab, string> = {
-    servers: copyText('总控 SSH 自动安装，心跳后自动出现在列表里', 'Master installs over SSH; it appears after heartbeat'),
-    exits: copyText('先用推荐协议创建一个节点，高级参数可以先不管', 'Create a node with recommended defaults first'),
-    gateways: copyText('高级入口配置，先不用动也可以', 'Advanced entry settings; optional at first'),
-    policies: copyText('高级分流配置，默认场景先不用配置', 'Advanced routing; optional for default use'),
-    tasks: copyText('部署、重载、健康检查的执行记录', 'Deploy, reload, and health-check records'),
+    servers: copyText('通过 SSH 安装 Agent，心跳成功后自动进入被控列表', 'Install the agent over SSH; heartbeat registers it automatically'),
+    exits: copyText('按协议模板生成入站配置并创建部署任务', 'Create protocol inbounds and queue deployment tasks'),
+    gateways: copyText('配置客户端连接入口和监听端口', 'Configure client-facing listeners and ports'),
+    policies: copyText('定义入口流量到出口池的调度规则', 'Define routing rules from entries to exits'),
+    tasks: copyText('安装、部署、重载、检查的执行记录', 'Install, deploy, reload, and health-check records'),
   };
   return map[active];
 }

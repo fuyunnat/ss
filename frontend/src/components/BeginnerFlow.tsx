@@ -18,15 +18,15 @@ export function BeginnerFlow({
   return (
     <section className="beginner-flow">
       <div className="flow-title">
-        <strong>{copyText('新手就按这 3 步走', 'Beginner path')}</strong>
-        <span>{copyText('不用先理解 Gateway、策略、任务这些概念，先把服务器上线，再创建一个节点。', 'Get an agent online first, then create one usable node.')}</span>
+        <strong>{copyText('上线流程', 'Launch Flow')}</strong>
+        <span>{copyText('接入 Agent 后部署协议，任务全程可追踪。', 'Enroll an agent, deploy a protocol, and audit every task.')}</span>
       </div>
       <div className="flow-cards">
         <article className={onlineServers > 0 ? 'flow-card done' : 'flow-card'}>
           <b>1</b>
           <div>
-            <strong>{copyText('面板一键安装被控', 'One-click agent install')}</strong>
-            <span>{onlineServers > 0 ? copyText(`已有 ${onlineServers} 台在线`, `${onlineServers} online`) : copyText('填写 SSH 信息后自动安装', 'Enter SSH info and install automatically')}</span>
+            <strong>{copyText('接入 Agent', 'Enroll Agent')}</strong>
+            <span>{onlineServers > 0 ? copyText(`${onlineServers} 台在线`, `${onlineServers} online`) : copyText('SSH 自动安装', 'Install over SSH')}</span>
           </div>
           <button className="secondary-button compact" type="button" onClick={onOpenServers}>
             {onlineServers > 0 ? copyText('查看', 'View') : copyText('安装', 'Install')}
@@ -35,8 +35,8 @@ export function BeginnerFlow({
         <article className={exitCount > 0 ? 'flow-card done' : 'flow-card'}>
           <b>2</b>
           <div>
-            <strong>{copyText('选择协议创建节点', 'Create protocol node')}</strong>
-            <span>{onlineServers > 0 ? copyText('点进去选 VLESS / VMess / Trojan', 'Pick VLESS / VMess / Trojan') : copyText('服务器在线后再创建', 'Enabled after agent online')}</span>
+            <strong>{copyText('部署协议', 'Deploy Protocol')}</strong>
+            <span>{onlineServers > 0 ? copyText('选择模板并下发', 'Select template and deploy') : copyText('等待 Agent 在线', 'Wait for agent online')}</span>
           </div>
           <button className="secondary-button compact" type="button" onClick={onlineServers > 0 ? onOpenNodes : onOpenServers}>
             {onlineServers > 0 ? copyText('创建', 'Create') : copyText('去上线', 'Install')}
@@ -45,8 +45,8 @@ export function BeginnerFlow({
         <article className="flow-card">
           <b>3</b>
           <div>
-            <strong>{copyText('看任务结果', 'Check result')}</strong>
-            <span>{copyText('部署、重载、检查都在这里留记录', 'Deploy and reload results stay here')}</span>
+            <strong>{copyText('审计任务', 'Audit Tasks')}</strong>
+            <span>{copyText('查看安装和部署结果', 'Review install and deploy results')}</span>
           </div>
           <button className="secondary-button compact" type="button" onClick={onOpenTasks}>{copyText('查看', 'Open')}</button>
         </article>

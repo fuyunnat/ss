@@ -16,7 +16,6 @@ export type ProtocolPreset = {
 type ProtocolBuilderProps = {
   copyText: (zh: string, en: string) => string;
   form: ProtocolForm;
-  installCommand: string;
   presets: ProtocolPreset[];
   servers: ServerNode[];
   summary: string;
@@ -28,7 +27,6 @@ type ProtocolBuilderProps = {
 export function ProtocolBuilder({
   copyText,
   form,
-  installCommand,
   presets,
   servers,
   summary,
@@ -161,7 +159,6 @@ export function ProtocolBuilder({
         <div className="deploy-preview">
           <span>{copyText('将创建部署任务', 'Deploy task preview')}</span>
           <strong>{summary}</strong>
-          {!hasServer && <code>{installCommand}</code>}
         </div>
 
         <div className="form-actions">
