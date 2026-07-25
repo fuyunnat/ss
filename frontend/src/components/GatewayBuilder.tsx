@@ -1,16 +1,25 @@
 import { FormEvent } from 'react';
-import { Plus } from 'lucide-react';
+import { Copy, Plus } from 'lucide-react';
 import type { Gateway, ProtocolListener } from '../types';
 import { Field } from './ui';
 
-export const gatewayProtocolDefaults: ProtocolListener[] = [
-  { protocol: 'vless', port: 443, enabled: true },
-  { protocol: 'vmess', port: 8443, enabled: true },
-  { protocol: 'trojan', port: 9443, enabled: true },
-  { protocol: 'shadowsocks', port: 8388, enabled: true },
-  { protocol: 'socks5', port: 1080, enabled: true },
-  { protocol: 'http', port: 8081, enabled: true },
+const protocolTemplates: ProtocolListener[] = [
+  { protocol: 'vless', port: 30000, enabled: true },
+  { protocol: 'vmess', port: 30001, enabled: true },
+  { protocol: 'trojan', port: 30002, enabled: true },
+  { protocol: 'shadowsocks', port: 30003, enabled: true },
+  { protocol: 'socks5', port: 30004, enabled: true },
+  { protocol: 'http', port: 30005, enabled: true },
 ];
+
+const legacyPorts: Record<string, number> = {
+  vless: 443,
+  vmess: 8443,
+  trojan: 9443,
+  shadowsocks: 8388,
+  socks5: 1080,
+  http: 8081,
+};
 
 type GatewayBuilderProps = {
   copyText: (zh: string, en: string) => string;
@@ -18,12 +27,18 @@ type GatewayBuilderProps = {
   onChange: (next: Gateway) => void;
   onSubmit: (event: FormEvent) => void;
   onReset: () => void;
+  onCopyLink: (text: string) => void;
 };
 
-export function GatewayBuilder({ copyText, form, onChange, onSubmit, onReset }: GatewayBuilderProps) {
+export function createGatewayProtocols(): ProtocolListener[] {
+  return protocolTemplates.map((item) => withConnectionDefaults(item));
+}
+
+export function GatewayBuilder({ copyText, form, onChange, onSubmit, onReset, onCopyLink }: GatewayBuilderProps) {
   const protocols = normalizeGatewayProtocols(form);
   const enabledCount = protocols.filter((item) => item.enabled).length;
   const isEditing = Boolean(form.id);
+  const connections = buildEntryConnections({ ...form, protocols }, copyText);
 
   function update(patch: Partial<Gateway>) {
     onChange({ ...form, ...patch });
@@ -73,6 +88,29 @@ export function GatewayBuilder({ copyText, form, onChange, onSubmit, onReset }: 
         <strong>{entrySummary({ ...form, protocols }, copyText)}</strong>
       </div>
 
+      <section className="entry-links">
+        <div className="link-preview-head">
+          <div>
+            <span>{copyText('客户端连接信息', 'Client Connection Info')}</span>
+            <strong>{copyText('保存入口后，用户按下面的协议链接连接主控', 'After saving the entry, clients connect to the master with these links')}</strong>
+          </div>
+        </div>
+        {connections.length === 0 ? (
+          <div className="empty-state"><strong>{copyText('未启用入口协议', 'No entry protocol enabled')}</strong></div>
+        ) : connections.map((item) => (
+          <article className="entry-link-card" key={item.protocol}>
+            <div className="entry-link-head">
+              <strong>{item.label}</strong>
+              <button className="secondary-button compact" type="button" disabled={!item.canCopy} onClick={() => onCopyLink(item.link)}><Copy size={15} />{copyText('复制', 'Copy')}</button>
+            </div>
+            <div className="link-row-grid">
+              {item.rows.map((row) => <span key={row.label}><b>{row.label}</b><i>{row.value}</i></span>)}
+            </div>
+            <code>{item.link || copyText('缺少连接参数', 'Missing connection parameters')}</code>
+          </article>
+        ))}
+      </section>
+
       <div className="form-actions">
         <button className="primary-button" type="submit"><Plus size={17} />{isEditing ? copyText('更新入口', 'Update Entry') : copyText('新增入口', 'Add Entry')}</button>
         <button className="secondary-button" type="button" onClick={onReset}>{copyText('清空', 'Reset')}</button>
@@ -84,12 +122,12 @@ export function GatewayBuilder({ copyText, form, onChange, onSubmit, onReset }: 
 export function normalizeGatewayProtocols(gateway: Gateway): ProtocolListener[] {
   const hasProtocols = (gateway.protocols ?? []).length > 0;
   const existing = new Map((gateway.protocols ?? []).map((item) => [item.protocol, item]));
-  return gatewayProtocolDefaults.map((item) => {
+  return protocolTemplates.map((item) => {
     const current = existing.get(item.protocol);
-    if (current) return { ...item, ...current };
+    if (current) return withConnectionDefaults({ ...item, ...current });
     if (item.protocol === 'socks5' && gateway.socksPort > 0) return { ...item, port: gateway.socksPort, enabled: true };
     if (item.protocol === 'http' && gateway.httpPort > 0) return { ...item, port: gateway.httpPort, enabled: true };
-    return hasProtocols ? item : { ...item, enabled: false };
+    return hasProtocols ? withConnectionDefaults(item) : { ...withConnectionDefaults(item), enabled: false };
   });
 }
 
@@ -121,6 +159,111 @@ function protocolLabel(protocol: string) {
   return protocol;
 }
 
+function withConnectionDefaults(item: ProtocolListener): ProtocolListener {
+  const template = protocolTemplates.find((candidate) => candidate.protocol === item.protocol);
+  const port = item.port === legacyPorts[item.protocol] ? template?.port ?? item.port : item.port;
+  const next = { ...item, port };
+  if ((next.protocol === 'vless' || next.protocol === 'vmess') && !next.credential) {
+    next.credential = randomUUID();
+  }
+  if (next.protocol === 'trojan' && !next.password) {
+    next.password = randomToken(16);
+  }
+  if (next.protocol === 'shadowsocks') {
+    next.method = next.method || 'chacha20-ietf-poly1305';
+    next.password = next.password || randomToken(16);
+    next.network = next.network || 'tcp+udp';
+  }
+  if ((next.protocol === 'socks5' || next.protocol === 'http')) {
+    next.authUser = next.authUser || 'fyss';
+    next.password = next.password || randomToken(12);
+  }
+  return next;
+}
+
+function buildEntryConnections(gateway: Gateway, copyText: (zh: string, en: string) => string) {
+  const host = clientHost(gateway.listenHost);
+  return normalizeGatewayProtocols(gateway)
+    .filter((item) => item.enabled && item.port > 0)
+    .map((item) => {
+      const name = encodeURIComponent(`${gateway.name || 'fyss-entry'}-${item.protocol}`);
+      const commonRows = [
+        { label: copyText('协议', 'Protocol'), value: protocolLabel(item.protocol) },
+        { label: copyText('地址', 'Host'), value: host },
+        { label: copyText('端口', 'Port'), value: String(item.port) },
+      ];
+
+      if (item.protocol === 'vless') {
+        const link = `vless://${item.credential}@${host}:${item.port}?encryption=none&type=tcp&security=none#${name}`;
+        return { protocol: item.protocol, label: 'VLESS', link, canCopy: Boolean(item.credential), rows: [...commonRows, { label: 'UUID', value: item.credential || '-' }] };
+      }
+      if (item.protocol === 'vmess') {
+        const payload = {
+          v: '2',
+          ps: `${gateway.name || 'fyss-entry'}-vmess`,
+          add: host,
+          port: String(item.port),
+          id: item.credential || '',
+          aid: '0',
+          scy: 'auto',
+          net: 'tcp',
+          type: 'none',
+          host: '',
+          path: '',
+          tls: '',
+          sni: '',
+        };
+        return { protocol: item.protocol, label: 'VMess', link: `vmess://${base64(JSON.stringify(payload))}`, canCopy: Boolean(item.credential), rows: [...commonRows, { label: 'UUID', value: item.credential || '-' }] };
+      }
+      if (item.protocol === 'trojan') {
+        const link = `trojan://${encodeURIComponent(item.password || '')}@${host}:${item.port}?security=none&type=tcp#${name}`;
+        return { protocol: item.protocol, label: 'Trojan', link, canCopy: Boolean(item.password), rows: [...commonRows, { label: copyText('密码', 'Password'), value: item.password || '-' }] };
+      }
+      if (item.protocol === 'shadowsocks') {
+        const userInfo = base64(`${item.method}:${item.password}`);
+        const link = `ss://${userInfo}@${host}:${item.port}#${name}`;
+        return { protocol: item.protocol, label: 'Shadowsocks', link, canCopy: Boolean(item.method && item.password), rows: [...commonRows, { label: copyText('加密', 'Method'), value: item.method || '-' }, { label: copyText('密码', 'Password'), value: item.password || '-' }] };
+      }
+      if (item.protocol === 'socks5') {
+        const auth = item.authUser || item.password ? `${encodeURIComponent(item.authUser || '')}:${encodeURIComponent(item.password || '')}@` : '';
+        return { protocol: item.protocol, label: 'SOCKS5', link: `socks5://${auth}${host}:${item.port}#${name}`, canCopy: Boolean(item.authUser && item.password), rows: [...commonRows, { label: copyText('用户名', 'Username'), value: item.authUser || '-' }, { label: copyText('密码', 'Password'), value: item.password || '-' }] };
+      }
+      const auth = item.authUser || item.password ? `${encodeURIComponent(item.authUser || '')}:${encodeURIComponent(item.password || '')}@` : '';
+      return { protocol: item.protocol, label: 'HTTP', link: `http://${auth}${host}:${item.port}#${name}`, canCopy: Boolean(item.authUser && item.password), rows: [...commonRows, { label: copyText('用户名', 'Username'), value: item.authUser || '-' }, { label: copyText('密码', 'Password'), value: item.password || '-' }] };
+    });
+}
+
+function clientHost(value: string) {
+  const host = value.trim();
+  if (!host || host === '0.0.0.0' || host === '::') return 'YOUR-MASTER-IP';
+  return host.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+}
+
 function numberValue(value: string) {
   return Number.parseInt(value, 10) || 0;
+}
+
+function randomUUID() {
+  return globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (part) => {
+    const next = Math.floor(Math.random() * 16);
+    const value = part === 'x' ? next : (next & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+function randomToken(length: number) {
+  const alphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint8Array(length);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
+}
+
+function base64(value: string) {
+  return btoa(unescape(encodeURIComponent(value)));
 }

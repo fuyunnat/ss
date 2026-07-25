@@ -34,6 +34,11 @@ export interface ProtocolListener {
   protocol: string;
   port: number;
   enabled: boolean;
+  credential?: string;
+  method?: string;
+  authUser?: string;
+  password?: string;
+  network?: string;
 }
 
 export interface ExitNode {

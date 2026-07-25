@@ -28,7 +28,7 @@ import { api, AuthError, clearAuthSession, getAuthSession } from './api';
 import { AgentAutoOnline } from './components/AgentAutoOnline';
 import { AIAssistant } from './components/AIAssistant';
 import { BeginnerFlow } from './components/BeginnerFlow';
-import { GatewayBuilder, entrySummary, gatewayProtocolDefaults, withLegacyPorts } from './components/GatewayBuilder';
+import { GatewayBuilder, createGatewayProtocols, entrySummary, withLegacyPorts } from './components/GatewayBuilder';
 import { LoginPanel } from './components/LoginPanel';
 import { ProtocolBuilder } from './components/ProtocolBuilder';
 import { SystemSettingsPanel } from './components/SystemSettingsPanel';
@@ -43,7 +43,12 @@ import type { AuthSession, ExitNode, Gateway, Policy, ProtocolForm, ServerNode, 
 type ResourceKind = 'server' | 'gateway' | 'exit' | 'policy';
 
 const emptySummary: Summary = { serverCount: 0, gatewayCount: 0, exitCount: 0, policyCount: 0, taskCount: 0, healthyExits: 0 };
-const emptyGateway: Gateway = { name: '', serverId: '', listenHost: '0.0.0.0', socksPort: 1080, httpPort: 8081, protocols: gatewayProtocolDefaults, status: 'planned' };
+function createEmptyGateway(): Gateway {
+  const protocols = createGatewayProtocols();
+  const socks = protocols.find((item) => item.protocol === 'socks5');
+  const http = protocols.find((item) => item.protocol === 'http');
+  return { name: '', serverId: '', listenHost: '0.0.0.0', socksPort: socks?.port ?? 30004, httpPort: http?.port ?? 30005, protocols, status: 'planned' };
+}
 const emptyExit: ExitNode = { name: '', type: 'external_socks5', serverId: '', address: '', port: 1080, username: '', region: '', weight: 100, enabled: true, health: 'unknown', latencyMs: 0, failureRate: 0 };
 const emptyPolicy: Policy = { name: '', matchType: 'default', matchValue: '*', strategy: 'health_weighted', exitIds: [], sticky: true, enabled: true };
 const emptyTask: Task = { type: 'sync_config', status: 'queued', targetType: 'gateway', targetId: '', summary: '', logs: [] };
@@ -65,7 +70,7 @@ function App() {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [settings, setSettings] = useState<SystemSettings | null>(null);
-  const [gatewayForm, setGatewayForm] = useState<Gateway>(emptyGateway);
+  const [gatewayForm, setGatewayForm] = useState<Gateway>(() => createEmptyGateway());
   const [exitForm, setExitForm] = useState<ExitNode>(emptyExit);
   const [policyForm, setPolicyForm] = useState<Policy>(emptyPolicy);
   const [taskForm, setTaskForm] = useState<Task>(emptyTask);
@@ -167,7 +172,7 @@ function App() {
     event.preventDefault();
     await withAction(async () => {
       await api.saveGateway(withLegacyPorts(gatewayForm));
-      setGatewayForm(emptyGateway);
+      setGatewayForm(createEmptyGateway());
       await refresh();
     }, t.app.saved);
   }
@@ -433,7 +438,8 @@ function App() {
                 form={gatewayForm}
                 onChange={setGatewayForm}
                 onSubmit={saveGateway}
-                onReset={() => setGatewayForm(emptyGateway)}
+                onReset={() => setGatewayForm(createEmptyGateway())}
+                onCopyLink={copyNodeText}
               />
             )}
 

@@ -75,6 +75,43 @@ func TestEmptyListsReturnArrays(t *testing.T) {
 	}
 }
 
+func TestGatewayPersistsProtocolConnectionInfo(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/gateways", strings.NewReader(`{
+		"name":"main-entry",
+		"listenHost":"0.0.0.0",
+		"protocols":[
+			{"protocol":"vless","port":30000,"enabled":true,"credential":"uuid-1"},
+			{"protocol":"socks5","port":30004,"enabled":true,"authUser":"fyss","password":"pass-1"}
+		]
+	}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/gateways", nil)
+	authorize(req, token)
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected list status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	for _, want := range []string{`"port":30000`, `"credential":"uuid-1"`, `"authUser":"fyss"`, `"password":"pass-1"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected gateway response to contain %s, got %s", want, body)
+		}
+	}
+}
+
 func TestAgentHeartbeatRequiresTokenWhenConfigured(t *testing.T) {
 	st, err := store.NewFileStore(t.TempDir() + "/state.json")
 	if err != nil {

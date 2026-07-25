@@ -30,9 +30,14 @@ type Gateway struct {
 }
 
 type ProtocolListener struct {
-	Protocol string `json:"protocol"`
-	Port     int    `json:"port"`
-	Enabled  bool   `json:"enabled"`
+	Protocol   string `json:"protocol"`
+	Port       int    `json:"port"`
+	Enabled    bool   `json:"enabled"`
+	Credential string `json:"credential,omitempty"`
+	Method     string `json:"method,omitempty"`
+	AuthUser   string `json:"authUser,omitempty"`
+	Password   string `json:"password,omitempty"`
+	Network    string `json:"network,omitempty"`
 }
 
 type ExitNode struct {
