@@ -385,6 +385,11 @@ p {
   gap: 6px;
 }
 
+.control-grid.node-mode .exit-row {
+  grid-template-columns: minmax(126px, 1fr) minmax(132px, 1.05fr) minmax(142px, 1.08fr) 72px 86px;
+  min-width: 680px;
+}
+
 .config-panel,
 .data-panel {
   min-width: 0;
@@ -1030,6 +1035,40 @@ button:focus-visible,
 .data-row > span {
   color: #64748b;
   font-size: 12px;
+}
+
+.exit-row {
+  min-height: 52px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.exit-row.head {
+  min-height: 30px;
+}
+
+.exit-cell {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.exit-cell b,
+.exit-cell small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exit-cell b {
+  color: #0f172a;
+  font-size: 12px;
+}
+
+.exit-cell small {
+  color: #64748b;
+  font-size: 11px;
 }
 
 .status-badge {

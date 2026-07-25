@@ -571,19 +571,44 @@ function App() {
               </DataTable>
             )}
             {active === 'exits' && (
-              <DataTable headers={[t.common.name, copyText('绑定服务器 / 协议', 'Server / Protocol'), t.common.status, t.common.operations]} empty={exits.length === 0 ? t.common.empty : ''}>
-                {exits.map((item) => {
+              <div className="data-table exit-table">
+                <div className="data-row head exit-row">
+                  <span>{t.common.name}</span>
+                  <span>{copyText('出口服务器', 'Exit Server')}</span>
+                  <span>{copyText('协议与地址', 'Protocol / Endpoint')}</span>
+                  <span>{t.common.status}</span>
+                  <span>{t.common.operations}</span>
+                </div>
+                {exits.length === 0 ? (
+                  <div className="empty-state"><Wifi size={20} /><strong>{t.common.empty}</strong></div>
+                ) : exits.map((item) => {
                   const server = item.serverId ? serverByID.get(item.serverId) : undefined;
-                  const serverText = server ? `${server.name} / ${server.host} / ${server.status || '-'}` : copyText('未绑定被控服务器', 'No controlled server bound');
                   const endpoint = `${item.address}:${item.port}`;
-                  return <DataRow key={item.id} title={item.name} detail={`${serverText} | ${item.type} | ${endpoint} | ${item.region || '-'} | weight ${item.weight}`} status={item.health || endpoint} good={item.health === 'healthy'} actions={<>
-                    <IconButton label={t.actions.edit} onClick={() => editExit(item)} icon={Pencil} />
-                    <IconButton label={copyText('复制链接', 'Copy Link')} onClick={() => copyNodeText(item.shareLink)} icon={Copy} disabled={!item.shareLink} />
-                    <IconButton label={t.actions.queueHealth} onClick={() => queueTask('health_check', 'exit', item.id ?? '', `${t.actions.queueHealth}: ${item.name}`)} icon={ShieldCheck} />
-                    <IconButton danger label={t.actions.delete} onClick={() => removeItem('exit', item.id)} icon={Trash2} />
-                  </>} />;
+                  return (
+                    <div className="data-row exit-row" key={item.id}>
+                      <div className="exit-cell exit-name">
+                        <b>{item.name}</b>
+                        <small>{copyText('权重', 'Weight')} {item.weight} · {item.region || copyText('未设置地区', 'No region')}</small>
+                      </div>
+                      <div className="exit-cell">
+                        <b>{server?.name ?? copyText('未绑定服务器', 'Unbound server')}</b>
+                        <small>{server ? `${server.host} · ${server.status || '-'}` : copyText('先选择被控服务器', 'Pick a controlled server')}</small>
+                      </div>
+                      <div className="exit-cell">
+                        <b>{exitTypeLabel(item.type)}</b>
+                        <small>{endpoint}</small>
+                      </div>
+                      <StatusBadge value={item.health || copyText('未检查', 'Unchecked')} good={item.health === 'healthy'} />
+                      <div className="row-actions">
+                        <IconButton label={t.actions.edit} onClick={() => editExit(item)} icon={Pencil} />
+                        <IconButton label={copyText('复制链接', 'Copy Link')} onClick={() => copyNodeText(item.shareLink)} icon={Copy} disabled={!item.shareLink} />
+                        <IconButton label={t.actions.queueHealth} onClick={() => queueTask('health_check', 'exit', item.id ?? '', `${t.actions.queueHealth}: ${item.name}`)} icon={ShieldCheck} />
+                        <IconButton danger label={t.actions.delete} onClick={() => removeItem('exit', item.id)} icon={Trash2} />
+                      </div>
+                    </div>
+                  );
                 })}
-              </DataTable>
+              </div>
             )}
             {active === 'policies' && (
               <DataTable headers={[t.common.name, t.common.match, t.common.strategy, t.common.operations]} empty={policies.length === 0 ? t.common.empty : ''}>
@@ -635,6 +660,31 @@ function DataRow({ title, detail, status, good = false, actions }: { title: stri
 
 function IconButton({ label, onClick, icon: Icon, danger = false, disabled = false }: { label: string; onClick: () => void; icon: LucideIcon; danger?: boolean; disabled?: boolean }) {
   return <button className={`icon-button ${danger ? 'danger' : ''}`} type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick}><Icon size={15} /></button>;
+}
+
+function exitTypeLabel(type: string) {
+  if (supportedExitProtocols.has(type)) return protocolName(type);
+  if (type === 'external_socks5') return '第三方 SOCKS5';
+  if (type === 'external_http') return '第三方 HTTP';
+  if (type === 'self_xray') return '自建 Xray';
+  if (type === 'self_singbox') return '自建 sing-box';
+
+  const parts = type.split('_');
+  if (parts.length >= 3 && parts[0] === 'self') {
+    return `${protocolName(parts.slice(2).join('_'))} / ${parts[1]}`;
+  }
+  return type;
+}
+
+function protocolName(protocol: string) {
+  if (protocol === 'vless') return 'VLESS';
+  if (protocol === 'vmess') return 'VMess';
+  if (protocol === 'trojan') return 'Trojan';
+  if (protocol === 'shadowsocks') return 'Shadowsocks';
+  if (protocol === 'socks5') return 'SOCKS5';
+  if (protocol === 'http') return 'HTTP';
+  if (protocol === 'dokodemo-door') return 'Dokodemo Door';
+  return protocol;
 }
 
 function buildDeploySummary(form: ProtocolForm, copyText: (zh: string, en: string) => string) {
