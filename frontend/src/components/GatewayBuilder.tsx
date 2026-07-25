@@ -164,26 +164,19 @@ function withConnectionDefaults(item: ProtocolListener): ProtocolListener {
   const template = protocolTemplates.find((candidate) => candidate.protocol === item.protocol);
   const port = item.port === legacyPorts[item.protocol] ? template?.port ?? item.port : item.port;
   const next = { ...item, port };
-  if ((next.protocol === 'vless' || next.protocol === 'vmess') && !next.credential) {
-    next.credential = randomUUID();
-  }
-  if (next.protocol === 'trojan' && !next.password) {
-    next.password = randomToken(16);
-  }
   if (next.protocol === 'shadowsocks') {
     next.method = next.method || 'chacha20-ietf-poly1305';
-    next.password = next.password || randomToken(16);
     next.network = next.network || 'tcp+udp';
   }
   if ((next.protocol === 'socks5' || next.protocol === 'http')) {
     next.authUser = next.authUser || 'fyss';
-    next.password = next.password || randomToken(12);
   }
   return next;
 }
 
 function buildEntryConnections(gateway: Gateway, copyText: (zh: string, en: string) => string, detectedHost: string) {
   const host = clientHost(gateway.listenHost, detectedHost);
+  const pending = copyText('保存后生成', 'Generated after save');
   return normalizeGatewayProtocols(gateway)
     .filter((item) => item.enabled && item.port > 0)
     .map((item) => {
@@ -196,7 +189,7 @@ function buildEntryConnections(gateway: Gateway, copyText: (zh: string, en: stri
 
       if (item.protocol === 'vless') {
         const link = `vless://${item.credential}@${host}:${item.port}?encryption=none&type=tcp&security=none#${name}`;
-        return { protocol: item.protocol, label: 'VLESS', link, canCopy: Boolean(item.credential), rows: [...commonRows, { label: 'UUID', value: item.credential || '-' }] };
+        return { protocol: item.protocol, label: 'VLESS', link, canCopy: Boolean(item.credential), rows: [...commonRows, { label: 'UUID', value: item.credential || pending }] };
       }
       if (item.protocol === 'vmess') {
         const payload = {
@@ -214,23 +207,23 @@ function buildEntryConnections(gateway: Gateway, copyText: (zh: string, en: stri
           tls: '',
           sni: '',
         };
-        return { protocol: item.protocol, label: 'VMess', link: `vmess://${base64(JSON.stringify(payload))}`, canCopy: Boolean(item.credential), rows: [...commonRows, { label: 'UUID', value: item.credential || '-' }] };
+        return { protocol: item.protocol, label: 'VMess', link: `vmess://${base64(JSON.stringify(payload))}`, canCopy: Boolean(item.credential), rows: [...commonRows, { label: 'UUID', value: item.credential || pending }] };
       }
       if (item.protocol === 'trojan') {
         const link = `trojan://${encodeURIComponent(item.password || '')}@${host}:${item.port}?security=none&type=tcp#${name}`;
-        return { protocol: item.protocol, label: 'Trojan', link, canCopy: Boolean(item.password), rows: [...commonRows, { label: copyText('密码', 'Password'), value: item.password || '-' }] };
+        return { protocol: item.protocol, label: 'Trojan', link, canCopy: Boolean(item.password), rows: [...commonRows, { label: copyText('密码', 'Password'), value: item.password || pending }] };
       }
       if (item.protocol === 'shadowsocks') {
         const userInfo = base64(`${item.method}:${item.password}`);
         const link = `ss://${userInfo}@${host}:${item.port}#${name}`;
-        return { protocol: item.protocol, label: 'Shadowsocks', link, canCopy: Boolean(item.method && item.password), rows: [...commonRows, { label: copyText('加密', 'Method'), value: item.method || '-' }, { label: copyText('密码', 'Password'), value: item.password || '-' }] };
+        return { protocol: item.protocol, label: 'Shadowsocks', link, canCopy: Boolean(item.method && item.password), rows: [...commonRows, { label: copyText('加密', 'Method'), value: item.method || '-' }, { label: copyText('密码', 'Password'), value: item.password || pending }] };
       }
       if (item.protocol === 'socks5') {
         const auth = item.authUser || item.password ? `${encodeURIComponent(item.authUser || '')}:${encodeURIComponent(item.password || '')}@` : '';
-        return { protocol: item.protocol, label: 'SOCKS5', link: `socks5://${auth}${host}:${item.port}#${name}`, canCopy: Boolean(item.authUser && item.password), rows: [...commonRows, { label: copyText('用户名', 'Username'), value: item.authUser || '-' }, { label: copyText('密码', 'Password'), value: item.password || '-' }] };
+        return { protocol: item.protocol, label: 'SOCKS5', link: `socks5://${auth}${host}:${item.port}#${name}`, canCopy: Boolean(item.authUser && item.password), rows: [...commonRows, { label: copyText('用户名', 'Username'), value: item.authUser || '-' }, { label: copyText('密码', 'Password'), value: item.password || pending }] };
       }
       const auth = item.authUser || item.password ? `${encodeURIComponent(item.authUser || '')}:${encodeURIComponent(item.password || '')}@` : '';
-      return { protocol: item.protocol, label: 'HTTP', link: `http://${auth}${host}:${item.port}#${name}`, canCopy: Boolean(item.authUser && item.password), rows: [...commonRows, { label: copyText('用户名', 'Username'), value: item.authUser || '-' }, { label: copyText('密码', 'Password'), value: item.password || '-' }] };
+      return { protocol: item.protocol, label: 'HTTP', link: `http://${auth}${host}:${item.port}#${name}`, canCopy: Boolean(item.authUser && item.password), rows: [...commonRows, { label: copyText('用户名', 'Username'), value: item.authUser || '-' }, { label: copyText('密码', 'Password'), value: item.password || pending }] };
     });
 }
 
@@ -252,27 +245,6 @@ function normalizeHost(value: string) {
 
 function numberValue(value: string) {
   return Number.parseInt(value, 10) || 0;
-}
-
-function randomUUID() {
-  return globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (part) => {
-    const next = Math.floor(Math.random() * 16);
-    const value = part === 'x' ? next : (next & 0x3) | 0x8;
-    return value.toString(16);
-  });
-}
-
-function randomToken(length: number) {
-  const alphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const bytes = new Uint8Array(length);
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let index = 0; index < bytes.length; index += 1) {
-      bytes[index] = Math.floor(Math.random() * 256);
-    }
-  }
-  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
 }
 
 function base64(value: string) {

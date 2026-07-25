@@ -96,3 +96,60 @@ func TestEnsureDefaultGatewayCreatesEntryProtocols(t *testing.T) {
 		t.Fatal("expected second ensure to keep existing gateway")
 	}
 }
+
+func TestUpsertGatewayGeneratesAndPreservesCredentials(t *testing.T) {
+	st, err := NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	first, err := st.UpsertGateway(Gateway{
+		Name:       "main-entry",
+		ListenHost: "0.0.0.0",
+		Protocols: []ProtocolListener{
+			{Protocol: "vless", Port: 30000, Enabled: true},
+			{Protocol: "socks5", Port: 30004, Enabled: true, AuthUser: "fyss"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("first upsert gateway: %v", err)
+	}
+	firstVLESS := protocolByName(first.Protocols, "vless")
+	firstSocks := protocolByName(first.Protocols, "socks5")
+	if firstVLESS.Credential == "" || firstSocks.Password == "" {
+		t.Fatalf("expected generated credentials: %+v", first.Protocols)
+	}
+
+	second, err := st.UpsertGateway(Gateway{
+		ID:         first.ID,
+		Name:       first.Name,
+		ListenHost: first.ListenHost,
+		Protocols: []ProtocolListener{
+			{Protocol: "vless", Port: 31000, Enabled: true},
+			{Protocol: "socks5", Port: 31004, Enabled: true, AuthUser: "fyss"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("second upsert gateway: %v", err)
+	}
+	secondVLESS := protocolByName(second.Protocols, "vless")
+	secondSocks := protocolByName(second.Protocols, "socks5")
+	if secondVLESS.Credential != firstVLESS.Credential {
+		t.Fatalf("expected vless credential to be preserved, first=%q second=%q", firstVLESS.Credential, secondVLESS.Credential)
+	}
+	if secondSocks.Password != firstSocks.Password {
+		t.Fatalf("expected socks password to be preserved, first=%q second=%q", firstSocks.Password, secondSocks.Password)
+	}
+	if secondVLESS.Port != 31000 || secondSocks.Port != 31004 {
+		t.Fatalf("expected updated ports, got vless=%d socks=%d", secondVLESS.Port, secondSocks.Port)
+	}
+}
+
+func protocolByName(protocols []ProtocolListener, name string) ProtocolListener {
+	for _, protocol := range protocols {
+		if protocol.Protocol == name {
+			return protocol
+		}
+	}
+	return ProtocolListener{}
+}

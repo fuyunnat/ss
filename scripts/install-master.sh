@@ -157,10 +157,11 @@ open_firewall() {
   fi
 
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    local ufw_entry_range="${ENTRY_PORT_RANGE/-/:}"
     info "检测到 ufw，放行端口: ${http_port}/tcp, ${ENTRY_PORT_RANGE}/tcp, ${ENTRY_PORT_RANGE}/udp"
     ufw allow "${http_port}/tcp" >/dev/null || warn "ufw 放行 ${http_port}/tcp 失败"
-    ufw allow "${ENTRY_PORT_RANGE}/tcp" >/dev/null || warn "ufw 放行 ${ENTRY_PORT_RANGE}/tcp 失败"
-    ufw allow "${ENTRY_PORT_RANGE}/udp" >/dev/null || warn "ufw 放行 ${ENTRY_PORT_RANGE}/udp 失败"
+    ufw allow "${ufw_entry_range}/tcp" >/dev/null || warn "ufw 放行 ${ENTRY_PORT_RANGE}/tcp 失败"
+    ufw allow "${ufw_entry_range}/udp" >/dev/null || warn "ufw 放行 ${ENTRY_PORT_RANGE}/udp 失败"
     return
   fi
 
@@ -270,7 +271,7 @@ plain='\033[0m'
 
 SERVICE_NAME="proxy-control"
 CONFIG_FILE="/etc/proxy-control/master.env"
-BOOTSTRAP_URL="${PROXY_CONTROL_MASTER_BOOTSTRAP_URL:-https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh}"
+BOOTSTRAP_URL="${PROXY_CONTROL_MASTER_BOOTSTRAP_URL:-${PROXY_CONTROL_BOOTSTRAP_URL:-https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh}}"
 ENTRY_PORT_RANGE="${PROXY_CONTROL_ENTRY_PORT_RANGE:-30000-30005}"
 FIREWALL_OPEN="${PROXY_CONTROL_FIREWALL_OPEN:-1}"
 
@@ -304,8 +305,18 @@ show_menu() {
 
 read_config_value() {
   local key="$1"
+  local line value
   if [ -f "$CONFIG_FILE" ]; then
-    grep -E "^${key}=" "$CONFIG_FILE" | sed -E 's/^[^=]+="?(.*?)"?$/\1/' || true
+    line="$(grep -E "^${key}=" "$CONFIG_FILE" | tail -n 1 || true)"
+    [ -n "$line" ] || return 0
+    value="${line#*=}"
+    value="${value%$'\r'}"
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+    value="${value//\\\"/\"}"
+    value="${value//\\\\/\\}"
+    printf '%s' "$value"
   fi
 }
 
@@ -362,10 +373,11 @@ open_firewall() {
   fi
 
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    local ufw_entry_range="${ENTRY_PORT_RANGE/-/:}"
     echo -e "${green}检测到 ufw，放行端口: ${http_port}/tcp, ${ENTRY_PORT_RANGE}/tcp, ${ENTRY_PORT_RANGE}/udp${plain}"
     ufw allow "${http_port}/tcp" >/dev/null || true
-    ufw allow "${ENTRY_PORT_RANGE}/tcp" >/dev/null || true
-    ufw allow "${ENTRY_PORT_RANGE}/udp" >/dev/null || true
+    ufw allow "${ufw_entry_range}/tcp" >/dev/null || true
+    ufw allow "${ufw_entry_range}/udp" >/dev/null || true
     return
   fi
 
@@ -493,7 +505,7 @@ print_result() {
 }
 
 open_manager_menu() {
-  if [ -r /dev/tty ]; then
+  if [ -t 0 ] && [ -t 1 ] && [ -r /dev/tty ]; then
     echo
     info "打开 fyss 管理菜单"
     "$MANAGER_FILE" menu </dev/tty

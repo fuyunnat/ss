@@ -231,8 +231,18 @@ show_menu() {
 
 read_config_value() {
   local key="$1"
+  local line value
   if [ -f "$CONFIG_FILE" ]; then
-    grep -E "^${key}=" "$CONFIG_FILE" | sed -E 's/^[^=]+="?(.*?)"?$/\1/' || true
+    line="$(grep -E "^${key}=" "$CONFIG_FILE" | tail -n 1 || true)"
+    [ -n "$line" ] || return 0
+    value="${line#*=}"
+    value="${value%$'\r'}"
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+    value="${value//\\\"/\"}"
+    value="${value//\\\\/\\}"
+    printf '%s' "$value"
   fi
 }
 
@@ -439,7 +449,7 @@ print_result() {
 }
 
 open_manager_menu() {
-  if [ -r /dev/tty ]; then
+  if [ -t 0 ] && [ -t 1 ] && [ -r /dev/tty ]; then
     echo
     info "打开 fyss 管理菜单"
     "$MANAGER_FILE" menu </dev/tty

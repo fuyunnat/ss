@@ -225,16 +225,9 @@ func (s *FileStore) EnsureDefaultGateway() (Gateway, bool, error) {
 		SocksPort:  30004,
 		HTTPPort:   30005,
 		Status:     "active",
-		Protocols: []ProtocolListener{
-			{Protocol: "vless", Port: 30000, Enabled: true, Credential: newUUID()},
-			{Protocol: "vmess", Port: 30001, Enabled: true, Credential: newUUID()},
-			{Protocol: "trojan", Port: 30002, Enabled: true, Password: newToken(16)},
-			{Protocol: "shadowsocks", Port: 30003, Enabled: true, Method: "chacha20-ietf-poly1305", Password: newToken(16), Network: "tcp+udp"},
-			{Protocol: "socks5", Port: 30004, Enabled: true, AuthUser: "fyss", Password: newToken(12)},
-			{Protocol: "http", Port: 30005, Enabled: true, AuthUser: "fyss", Password: newToken(12)},
-		},
-		CreatedAt: now,
-		UpdatedAt: now,
+		Protocols:  defaultGatewayProtocols(nil),
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 	s.state.Gateways = append(s.state.Gateways, item)
 	return item, true, s.saveLocked()
@@ -245,11 +238,22 @@ func (s *FileStore) UpsertGateway(input Gateway) (Gateway, error) {
 	defer s.mu.Unlock()
 
 	now := time.Now().UTC()
+	var existing *Gateway
+	if input.ID != "" {
+		for i := range s.state.Gateways {
+			if s.state.Gateways[i].ID == input.ID {
+				item := s.state.Gateways[i]
+				existing = &item
+				break
+			}
+		}
+	}
 	if input.ID == "" {
 		input.ID = newID()
 		input.CreatedAt = now
 		input.Status = defaultString(input.Status, "planned")
 	}
+	input.Protocols = mergeGatewayProtocols(input.Protocols, gatewayProtocols(existing), input.SocksPort, input.HTTPPort)
 	input.UpdatedAt = now
 
 	for i := range s.state.Gateways {
@@ -274,6 +278,120 @@ func (s *FileStore) DeleteGateway(id string) error {
 		}
 	}
 	return ErrNotFound
+}
+
+func gatewayProtocols(gateway *Gateway) []ProtocolListener {
+	if gateway == nil {
+		return nil
+	}
+	return gateway.Protocols
+}
+
+func defaultGatewayProtocols(existing []ProtocolListener) []ProtocolListener {
+	return mergeGatewayProtocols([]ProtocolListener{
+		{Protocol: "vless", Port: 30000, Enabled: true},
+		{Protocol: "vmess", Port: 30001, Enabled: true},
+		{Protocol: "trojan", Port: 30002, Enabled: true},
+		{Protocol: "shadowsocks", Port: 30003, Enabled: true},
+		{Protocol: "socks5", Port: 30004, Enabled: true},
+		{Protocol: "http", Port: 30005, Enabled: true},
+	}, existing, 0, 0)
+}
+
+func mergeGatewayProtocols(requested []ProtocolListener, existing []ProtocolListener, socksPort int, httpPort int) []ProtocolListener {
+	existingByProtocol := map[string]ProtocolListener{}
+	for _, item := range existing {
+		existingByProtocol[item.Protocol] = item
+	}
+
+	if len(requested) == 0 {
+		requested = []ProtocolListener{
+			{Protocol: "vless", Port: 30000, Enabled: true},
+			{Protocol: "vmess", Port: 30001, Enabled: true},
+			{Protocol: "trojan", Port: 30002, Enabled: true},
+			{Protocol: "shadowsocks", Port: 30003, Enabled: true},
+			{Protocol: "socks5", Port: defaultInt(socksPort, 30004), Enabled: true},
+			{Protocol: "http", Port: defaultInt(httpPort, 30005), Enabled: true},
+		}
+	}
+
+	merged := make([]ProtocolListener, 0, len(requested))
+	for _, item := range requested {
+		if item.Port == 0 {
+			item.Port = defaultGatewayPort(item.Protocol)
+		}
+		if item.Protocol == "socks5" && socksPort > 0 {
+			item.Port = socksPort
+		}
+		if item.Protocol == "http" && httpPort > 0 {
+			item.Port = httpPort
+		}
+		item = fillGatewayCredential(item, existingByProtocol[item.Protocol])
+		merged = append(merged, item)
+	}
+	return merged
+}
+
+func fillGatewayCredential(item ProtocolListener, previous ProtocolListener) ProtocolListener {
+	switch item.Protocol {
+	case "vless", "vmess":
+		if item.Credential == "" {
+			item.Credential = previous.Credential
+		}
+		if item.Credential == "" {
+			item.Credential = newUUID()
+		}
+	case "trojan":
+		if item.Password == "" {
+			item.Password = previous.Password
+		}
+		if item.Password == "" {
+			item.Password = newToken(16)
+		}
+	case "shadowsocks":
+		if item.Method == "" {
+			item.Method = defaultString(previous.Method, "chacha20-ietf-poly1305")
+		}
+		if item.Password == "" {
+			item.Password = previous.Password
+		}
+		if item.Password == "" {
+			item.Password = newToken(16)
+		}
+		if item.Network == "" {
+			item.Network = defaultString(previous.Network, "tcp+udp")
+		}
+	case "socks5", "http":
+		if item.AuthUser == "" {
+			item.AuthUser = defaultString(previous.AuthUser, "fyss")
+		}
+		if item.Password == "" {
+			item.Password = previous.Password
+		}
+		if item.Password == "" {
+			item.Password = newToken(12)
+		}
+	}
+	return item
+}
+
+func defaultGatewayPort(protocol string) int {
+	switch protocol {
+	case "vless":
+		return 30000
+	case "vmess":
+		return 30001
+	case "trojan":
+		return 30002
+	case "shadowsocks":
+		return 30003
+	case "socks5":
+		return 30004
+	case "http":
+		return 30005
+	default:
+		return 0
+	}
 }
 
 func (s *FileStore) ListExits() []ExitNode {
@@ -545,6 +663,13 @@ func newUUID() string {
 
 func defaultString(value string, fallback string) string {
 	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func defaultInt(value int, fallback int) int {
+	if value == 0 {
 		return fallback
 	}
 	return value

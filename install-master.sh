@@ -30,7 +30,7 @@ GitHub 一键安装:
   会自动安装 Xray Core 作为主入口协议运行时。
   如果检测到已启用的 firewalld 或 ufw，会自动放行面板端口和默认主入口端口。
 
-安装完成后会自动打开 fyss 管理菜单；以后直接执行 fyss 进入菜单。
+交互式运行安装器时会自动打开 fyss 管理菜单；管道安装完成后直接执行 fyss 进入菜单。
 
 环境变量:
   PROXY_CONTROL_GITHUB_REPO          GitHub 仓库，默认: fuyunnat/ss
