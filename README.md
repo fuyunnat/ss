@@ -15,8 +15,8 @@ This project is a new management system. It uses mature proxy cores such as Xray
 
 The panel is organized around the shortest usable path:
 
-1. Open **Bring Online / 服务器上线** and copy the Linux agent install command to the VPS.
-2. Wait for the agent heartbeat. The server appears in the panel automatically.
+1. Open **Bring Online / 服务器上线**, enter the VPS SSH information, master URL, token, node name, and region.
+2. Click one-click install. The master connects over SSH, runs the GitHub installer, and the server appears in the panel after heartbeat.
 3. Open **Create Node / 创建节点**, choose the online server and an inbound protocol, then create the deployment task.
 
 Gateway, routing policy, and task records remain available for advanced control, but a new user does not need to configure them before bringing the first node online.
@@ -45,7 +45,15 @@ Default backend address: `http://localhost:8080`.
 
 ## Agent Install
 
-On a controlled Linux server, install from GitHub:
+The normal path is the panel one-click installer. It calls:
+
+```text
+POST /api/agent/install
+```
+
+The request contains SSH connection details and agent install parameters. After validation, the backend creates an install task and runs SSH installation in the background. SSH passwords or private keys are only used for the current request and are not stored in `state.json`. When `PROXY_CONTROL_AGENT_TOKEN` is configured, the submitted agent token must match it before installation starts.
+
+Manual fallback command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh \

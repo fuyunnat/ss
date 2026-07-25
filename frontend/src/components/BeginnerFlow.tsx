@@ -1,9 +1,7 @@
 type BeginnerFlowProps = {
   copyText: (zh: string, en: string) => string;
-  installCommand: string;
   onlineServers: number;
   exitCount: number;
-  onCopy: () => void;
   onOpenServers: () => void;
   onOpenNodes: () => void;
   onOpenTasks: () => void;
@@ -11,10 +9,8 @@ type BeginnerFlowProps = {
 
 export function BeginnerFlow({
   copyText,
-  installCommand,
   onlineServers,
   exitCount,
-  onCopy,
   onOpenServers,
   onOpenNodes,
   onOpenTasks,
@@ -29,11 +25,11 @@ export function BeginnerFlow({
         <article className={onlineServers > 0 ? 'flow-card done' : 'flow-card'}>
           <b>1</b>
           <div>
-            <strong>{copyText('复制命令到 VPS 执行', 'Run installer on VPS')}</strong>
-            <span>{onlineServers > 0 ? copyText(`已有 ${onlineServers} 台在线`, `${onlineServers} online`) : copyText('跑完脚本会自动上线', 'Agent appears automatically')}</span>
+            <strong>{copyText('面板一键安装被控', 'One-click agent install')}</strong>
+            <span>{onlineServers > 0 ? copyText(`已有 ${onlineServers} 台在线`, `${onlineServers} online`) : copyText('填写 SSH 信息后自动安装', 'Enter SSH info and install automatically')}</span>
           </div>
-          <button className="secondary-button compact" type="button" onClick={onlineServers > 0 ? onOpenServers : onCopy}>
-            {onlineServers > 0 ? copyText('查看', 'View') : copyText('复制', 'Copy')}
+          <button className="secondary-button compact" type="button" onClick={onOpenServers}>
+            {onlineServers > 0 ? copyText('查看', 'View') : copyText('安装', 'Install')}
           </button>
         </article>
         <article className={exitCount > 0 ? 'flow-card done' : 'flow-card'}>
@@ -55,7 +51,6 @@ export function BeginnerFlow({
           <button className="secondary-button compact" type="button" onClick={onOpenTasks}>{copyText('查看', 'Open')}</button>
         </article>
       </div>
-      <code>{installCommand}</code>
     </section>
   );
 }

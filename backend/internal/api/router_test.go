@@ -93,3 +93,80 @@ func TestAgentHeartbeatRequiresTokenWhenConfigured(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
 	}
 }
+
+func TestAgentInstallValidatesRequiredFields(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router := NewRouter(st, "http://localhost:5173", "secret-token")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/install", strings.NewReader(`{"sshHost":"","sshUser":"root"}`))
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", res.Code, res.Body.String())
+	}
+}
+
+func TestAgentInstallRejectsMismatchedToken(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router := NewRouter(st, "http://localhost:5173", "secret-token")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/agent/install", strings.NewReader(`{
+		"sshHost":"203.0.113.10",
+		"sshUser":"root",
+		"masterUrl":"http://master:8080",
+		"agentToken":"wrong-token",
+		"nodeName":"hk-01"
+	}`))
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", res.Code, res.Body.String())
+	}
+}
+
+func TestBuildSSHCommandDoesNotPutPasswordInArgs(t *testing.T) {
+	command, args, err := buildSSHCommand(agentInstallRequest{
+		SSHHost:     "203.0.113.10",
+		SSHUser:     "root",
+		AuthMethod:  "password",
+		SSHPassword: "secret-password",
+		MasterURL:   "http://master:8080",
+		AgentToken:  "agent-token",
+		NodeName:    "hk-01",
+	}, "")
+	if err != nil && strings.Contains(err.Error(), "sshpass") {
+		t.Skip("sshpass is not installed in this environment")
+	}
+	if err != nil {
+		t.Fatalf("build command: %v", err)
+	}
+	if command != "sshpass" {
+		t.Fatalf("expected sshpass command, got %s", command)
+	}
+	if strings.Contains(strings.Join(args, " "), "secret-password") {
+		t.Fatalf("ssh password leaked into command args: %#v", args)
+	}
+}
+
+func TestBuildSSHCommandDoesNotPutAgentTokenInArgs(t *testing.T) {
+	_, args, err := buildSSHCommand(agentInstallRequest{
+		SSHHost:    "203.0.113.10",
+		SSHUser:    "root",
+		AuthMethod: "agent",
+		MasterURL:  "http://master:8080",
+		AgentToken: "agent-token",
+		NodeName:   "hk-01",
+	}, "")
+	if err != nil {
+		t.Fatalf("build command: %v", err)
+	}
+	if strings.Contains(strings.Join(args, " "), "agent-token") {
+		t.Fatalf("agent token leaked into command args: %#v", args)
+	}
+}

@@ -47,6 +47,14 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
+write_env() {
+  local name="$1"
+  local value="$2"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s="%s"\n' "$name" "$value"
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
@@ -55,14 +63,14 @@ cd "${REPO_ROOT}/backend"
 go build -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/proxy-control-agent" ./cmd/agent
 chmod 0755 "${INSTALL_DIR}/proxy-control-agent"
 
-cat > "$CONFIG_FILE" <<EOF
-PROXY_CONTROL_MASTER_URL=${MASTER_URL}
-PROXY_CONTROL_AGENT_TOKEN=${AGENT_TOKEN}
-PROXY_CONTROL_NODE_NAME=${NODE_NAME}
-PROXY_CONTROL_NODE_REGION=${NODE_REGION}
-PROXY_CONTROL_NODE_HOST=${NODE_HOST}
-PROXY_CONTROL_HEARTBEAT_INTERVAL=30s
-EOF
+{
+  write_env "PROXY_CONTROL_MASTER_URL" "$MASTER_URL"
+  write_env "PROXY_CONTROL_AGENT_TOKEN" "$AGENT_TOKEN"
+  write_env "PROXY_CONTROL_NODE_NAME" "$NODE_NAME"
+  write_env "PROXY_CONTROL_NODE_REGION" "$NODE_REGION"
+  write_env "PROXY_CONTROL_NODE_HOST" "$NODE_HOST"
+  write_env "PROXY_CONTROL_HEARTBEAT_INTERVAL" "30s"
+} > "$CONFIG_FILE"
 chmod 0600 "$CONFIG_FILE"
 
 cat > "$SERVICE_FILE" <<EOF

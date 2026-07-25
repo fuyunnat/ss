@@ -1,4 +1,4 @@
-import type { ExitNode, Gateway, Policy, ServerNode, Summary, Task } from './types';
+import type { AgentInstallRequest, ExitNode, Gateway, Policy, ServerNode, Summary, Task } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -35,4 +35,6 @@ export const api = {
   tasks: () => request<Task[]>('/api/tasks'),
   createTask: (payload: Task) => request<Task>('/api/tasks', { method: 'POST', body: JSON.stringify(payload) }),
   runTask: (id: string) => request<Task>(`/api/tasks/${id}/run`, { method: 'POST' }),
+
+  installAgent: (payload: AgentInstallRequest) => request<Task>('/api/agent/install', { method: 'POST', body: JSON.stringify(payload) }),
 };

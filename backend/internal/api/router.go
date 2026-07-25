@@ -20,6 +20,7 @@ func NewRouter(st *store.FileStore, corsAllowOrigin string, agentToken string) h
 
 	mux.HandleFunc("/api/health", r.handleHealth)
 	mux.HandleFunc("/api/agent/heartbeat", r.handleAgentHeartbeat)
+	mux.HandleFunc("/api/agent/install", r.handleAgentInstall)
 	mux.HandleFunc("/api/summary", r.handleSummary)
 	mux.HandleFunc("/api/servers", r.handleServers)
 	mux.HandleFunc("/api/servers/", r.handleServerByID)

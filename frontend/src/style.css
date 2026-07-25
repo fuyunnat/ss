@@ -15,7 +15,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -586,7 +587,8 @@ p {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 34px;
   padding: 0 9px;
@@ -597,12 +599,19 @@ select {
   outline: 0;
 }
 
+textarea {
+  min-height: 92px;
+  padding: 8px 9px;
+  resize: vertical;
+}
+
 input::placeholder {
   color: #94a3b8;
 }
 
 input:focus,
 select:focus,
+textarea:focus,
 button:focus-visible {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);

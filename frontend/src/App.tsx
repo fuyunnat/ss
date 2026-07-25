@@ -3,7 +3,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
   CheckCircle2,
-  Clipboard,
   Database,
   Globe2,
   Languages,
@@ -301,10 +300,8 @@ function App() {
 
         <BeginnerFlow
           copyText={copyText}
-          installCommand={installCommand}
           onlineServers={onlineServers}
           exitCount={summary.exitCount}
-          onCopy={copyInstallCommand}
           onOpenServers={() => setActive('servers')}
           onOpenNodes={() => setActive('exits')}
           onOpenTasks={() => setActive('tasks')}
@@ -383,17 +380,14 @@ function App() {
             )}
 
             {active === 'servers' && (
-              <>
-                <div className="install-card">
-                  <div>
-                    <strong>{t.install.title}</strong>
-                    <span>{t.install.hint}</span>
-                  </div>
-                  <code>{installCommand}</code>
-                  <button className="secondary-button full" type="button" onClick={copyInstallCommand}><Clipboard size={16} />{t.actions.copy}</button>
-                </div>
-                <AgentAutoOnline copyText={copyText} />
-              </>
+              <AgentAutoOnline
+                copyText={copyText}
+                installCommand={installCommand}
+                onCopied={copyInstallCommand}
+                onInstalled={refresh}
+                onNotice={showNotice}
+                onError={setError}
+              />
             )}
 
             {active === 'tasks' && (
@@ -542,7 +536,7 @@ function taskTargetLabel(target: string, copyText: (zh: string, en: string) => s
 
 function panelDesc(active: ActiveTab, copyText: (zh: string, en: string) => string) {
   const map: Record<ActiveTab, string> = {
-    servers: copyText('复制命令到 VPS，脚本跑完自动出现在列表里', 'Copy installer to VPS; it appears automatically'),
+    servers: copyText('总控 SSH 自动安装，心跳后自动出现在列表里', 'Master installs over SSH; it appears after heartbeat'),
     exits: copyText('先用推荐协议创建一个节点，高级参数可以先不管', 'Create a node with recommended defaults first'),
     gateways: copyText('高级入口配置，先不用动也可以', 'Advanced entry settings; optional at first'),
     policies: copyText('高级分流配置，默认场景先不用配置', 'Advanced routing; optional for default use'),

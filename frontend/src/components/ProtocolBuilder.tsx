@@ -94,7 +94,7 @@ export function ProtocolBuilder({
         {!hasServer && (
           <div className="inline-warning">
             <strong>{copyText('还没有在线服务器', 'No online agent yet')}</strong>
-            <span>{copyText('先去“服务器上线”复制安装命令，跑完脚本后这里会自动出现服务器。', 'Copy the installer under Agents first; the server appears here after heartbeat.')}</span>
+            <span>{copyText('先去“服务器上线”一键安装被控，心跳后这里会自动出现服务器。', 'Use one-click Agent install first; the server appears here after heartbeat.')}</span>
           </div>
         )}
         <div className="form-row">

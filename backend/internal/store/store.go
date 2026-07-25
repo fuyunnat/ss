@@ -268,6 +268,24 @@ func (s *FileStore) RunTask(id string) (Task, error) {
 	return Task{}, ErrNotFound
 }
 
+func (s *FileStore) UpdateTask(id string, status string, logs ...TaskLog) (Task, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	for i := range s.state.Tasks {
+		if s.state.Tasks[i].ID == id {
+			if status != "" {
+				s.state.Tasks[i].Status = status
+			}
+			s.state.Tasks[i].UpdatedAt = now
+			s.state.Tasks[i].Logs = append(s.state.Tasks[i].Logs, logs...)
+			return s.state.Tasks[i], s.saveLocked()
+		}
+	}
+	return Task{}, ErrNotFound
+}
+
 func (s *FileStore) load() error {
 	content, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {

@@ -72,6 +72,20 @@ export interface Task {
   logs: TaskLog[];
 }
 
+export interface AgentInstallRequest {
+  sshHost: string;
+  sshPort: number;
+  sshUser: string;
+  authMethod: 'agent' | 'password' | 'private_key';
+  sshPassword: string;
+  privateKey: string;
+  masterUrl: string;
+  agentToken: string;
+  nodeName: string;
+  region: string;
+  nodeHost: string;
+}
+
 export interface ProtocolForm {
   name: string;
   serverId: string;
