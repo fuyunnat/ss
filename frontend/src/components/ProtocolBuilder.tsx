@@ -67,6 +67,15 @@ export function ProtocolBuilder({
     });
   }
 
+  function updateProtocol(protocol: string) {
+    const preset = presets.find((item) => item.protocol === protocol);
+    if (preset) {
+      applyPreset(preset);
+      return;
+    }
+    update({ protocol });
+  }
+
   return (
     <section className="protocol-builder">
       <div className="builder-head">
@@ -81,20 +90,6 @@ export function ProtocolBuilder({
         <span className={hasServer ? 'done' : ''}>{copyText('1 被控服务器在线', '1 Agent online')}</span>
         <span className={form.serverId ? 'done' : ''}>{copyText('2 选择出口服务器', '2 Pick exit server')}</span>
         <span>{copyText('3 创建出口协议', '3 Create exit protocol')}</span>
-      </div>
-
-      <div className="preset-grid">
-        {presets.map((preset) => (
-          <button
-            key={`${preset.protocol}-${preset.core}-${preset.security}`}
-            className={form.protocol === preset.protocol && form.core === preset.core && form.security === preset.security ? 'preset active' : 'preset'}
-            type="button"
-            onClick={() => applyPreset(preset)}
-          >
-            <strong>{preset.label}</strong>
-            <span>{copyText(preset.hint, preset.hint)} · {preset.core}</span>
-          </button>
-        ))}
       </div>
 
       <form className="control-form" onSubmit={onSubmit}>
@@ -132,7 +127,11 @@ export function ProtocolBuilder({
         </section>
         <div className="form-row three">
           <Field label={copyText('节点名称', 'Node Name')}><input value={form.name} onChange={(event) => update({ name: event.target.value })} required placeholder="hk-vless-01" /></Field>
-          <Field label={copyText('当前协议', 'Current Protocol')}><input value={protocolLabel(form.protocol)} readOnly /></Field>
+          <Field label={copyText('协议', 'Protocol')}>
+            <select value={form.protocol} onChange={(event) => updateProtocol(event.target.value)}>
+              {presets.map((preset) => <option key={`${preset.protocol}-${preset.core}-${preset.security}`} value={preset.protocol}>{preset.label}</option>)}
+            </select>
+          </Field>
           <Field label={copyText('核心', 'Core')}><select value={form.core} onChange={(event) => update({ core: event.target.value })}><option>xray</option><option>sing-box</option></select></Field>
         </div>
         <div className="form-row three">

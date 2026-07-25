@@ -510,48 +510,6 @@ p {
   line-height: 1.35;
 }
 
-.preset-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.preset {
-  display: grid;
-  gap: 2px;
-  min-height: 42px;
-  padding: 6px 7px;
-  border: 1px solid #dbe4ee;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #334155;
-  text-align: left;
-}
-
-.preset:hover,
-.preset.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-}
-
-.preset strong,
-.preset span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.preset strong {
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.preset span {
-  color: #64748b;
-  font-size: 11px;
-}
-
 .deploy-preview {
   display: grid;
   gap: 6px;
@@ -1275,7 +1233,6 @@ button:focus-visible {
   }
 
   .build-steps,
-  .preset-grid,
   .entry-protocol-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1321,7 +1278,6 @@ button:focus-visible {
   .build-steps,
   .auto-steps,
   .auto-fields,
-  .preset-grid,
   .entry-protocol-grid,
   .form-row,
   .form-row.three {
