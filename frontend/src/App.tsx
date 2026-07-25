@@ -30,7 +30,7 @@ import { BeginnerFlow } from './components/BeginnerFlow';
 import { GatewayBuilder, entrySummary, gatewayProtocolDefaults, withLegacyPorts } from './components/GatewayBuilder';
 import { LoginPanel } from './components/LoginPanel';
 import { ProtocolBuilder } from './components/ProtocolBuilder';
-import { CustomSelect, Field, StatusBadge } from './components/ui';
+import { CustomSelect, Field, StatusBadge, statusLabel } from './components/ui';
 import { numberValue, panelDesc, readLocale, shortID, splitList, taskStatusLabel, taskTargetLabel, taskTypeMeta, type ActiveTab } from './appHelpers';
 import { messages, type Locale } from './i18n';
 import { policyMatchMeta, policyMatchOptions, policyMatchSummary, policyStrategyMeta, policyStrategyOptions } from './policyOptions';
@@ -592,7 +592,7 @@ function App() {
                       </div>
                       <div className="exit-cell">
                         <b>{server?.name ?? copyText('未绑定服务器', 'Unbound server')}</b>
-                        <small>{server ? `${server.host} · ${server.status || '-'}` : copyText('先选择被控服务器', 'Pick a controlled server')}</small>
+                        <small>{server ? `${server.host} · ${statusLabel(server.status || '-')}` : copyText('先选择被控服务器', 'Pick a controlled server')}</small>
                       </div>
                       <div className="exit-cell">
                         <b>{exitTypeLabel(item.type)}</b>

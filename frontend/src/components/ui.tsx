@@ -7,7 +7,24 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 
 export function StatusBadge({ value, good = false }: { value: string; good?: boolean }) {
   const tone = good || value === 'online' || value === 'healthy' || value === 'succeeded' ? 'good' : value === 'failed' || value === 'offline' ? 'bad' : 'neutral';
-  return <em className={`status-badge ${tone}`}>{value}</em>;
+  return <em className={`status-badge ${tone}`}>{statusLabel(value)}</em>;
+}
+
+export function statusLabel(value: string) {
+  const map: Record<string, string> = {
+    active: '启用',
+    planned: '待部署',
+    online: '在线',
+    offline: '离线',
+    healthy: '健康',
+    unhealthy: '异常',
+    unknown: '未知',
+    succeeded: '成功',
+    failed: '失败',
+    running: '执行中',
+    queued: '排队中',
+  };
+  return map[value] ?? value;
 }
 
 type SelectOption = string | { value: string; label: string };
