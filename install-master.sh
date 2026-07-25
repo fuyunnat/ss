@@ -6,8 +6,9 @@ green='\033[0;32m'
 yellow='\033[0;33m'
 plain='\033[0m'
 
-REPO_URL="${PROXY_CONTROL_REPO_URL:-https://github.com/fuyunnat/ss.git}"
-REPO_REF="${PROXY_CONTROL_REPO_REF:-feature/proxy-control-mvp}"
+GITHUB_REPO="${PROXY_CONTROL_GITHUB_REPO:-fuyunnat/ss}"
+VERSION="${PROXY_CONTROL_VERSION:-latest}"
+PACKAGE_URL="${PROXY_CONTROL_MASTER_PACKAGE_URL:-}"
 WORK_DIR=""
 release="unknown"
 arch_name="$(uname -m)"
@@ -22,11 +23,17 @@ fyss 主控一键安装脚本
 GitHub 一键安装:
   curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh | sudo bash
 
+安装方式:
+  下载已经编译好的 Linux 主控安装包，不在服务器上安装 Go、Node 或 npm。
+  安装包内包含主控二进制和前端 dist，解压后安装到 /opt/proxy-control，
+  并注册 systemd 服务。
+
 安装完成后会自动打开 fyss 管理菜单；以后直接执行 fyss 进入菜单。
 
 环境变量:
-  PROXY_CONTROL_REPO_URL  Git 仓库地址，默认: https://github.com/fuyunnat/ss.git
-  PROXY_CONTROL_REPO_REF  Git 分支/标签/commit，默认: feature/proxy-control-mvp
+  PROXY_CONTROL_GITHUB_REPO          GitHub 仓库，默认: fuyunnat/ss
+  PROXY_CONTROL_VERSION              Release 版本，默认: latest
+  PROXY_CONTROL_MASTER_PACKAGE_URL   自定义主控安装包 URL
 EOF
 }
 
@@ -91,10 +98,8 @@ install_packages() {
 ensure_dependencies() {
   local missing=()
   command -v curl >/dev/null 2>&1 || missing+=("curl")
-  command -v git >/dev/null 2>&1 || missing+=("git")
-  command -v go >/dev/null 2>&1 || missing+=("go")
-  command -v node >/dev/null 2>&1 || missing+=("nodejs")
-  command -v npm >/dev/null 2>&1 || missing+=("npm")
+  command -v tar >/dev/null 2>&1 || missing+=("tar")
+  command -v systemctl >/dev/null 2>&1 || fail "当前系统未检测到 systemd，无法安装为系统服务"
 
   if [ "${#missing[@]}" -eq 0 ]; then
     return
@@ -103,21 +108,42 @@ ensure_dependencies() {
   warn "检测到缺少依赖: ${missing[*]}，开始自动安装"
   case "$release" in
     ubuntu|debian)
-      install_packages ca-certificates curl git golang-go nodejs npm
+      install_packages ca-certificates curl tar
       ;;
     centos|fedora|rocky|almalinux|rhel)
-      install_packages ca-certificates curl git golang nodejs npm
+      install_packages ca-certificates curl tar
       ;;
     *)
-      install_packages ca-certificates curl git golang-go nodejs npm || install_packages ca-certificates curl git golang nodejs npm
+      install_packages ca-certificates curl tar
       ;;
   esac
 
   command -v curl >/dev/null 2>&1 || fail "curl 安装失败"
-  command -v git >/dev/null 2>&1 || fail "git 安装失败"
-  command -v go >/dev/null 2>&1 || fail "Go 安装失败"
-  command -v node >/dev/null 2>&1 || fail "Node.js 安装失败"
-  command -v npm >/dev/null 2>&1 || fail "npm 安装失败"
+  command -v tar >/dev/null 2>&1 || fail "tar 安装失败"
+}
+
+release_download_url() {
+  local asset="$1"
+  if [ "$VERSION" = "latest" ]; then
+    printf 'https://github.com/%s/releases/latest/download/%s' "$GITHUB_REPO" "$asset"
+    return
+  fi
+  printf 'https://github.com/%s/releases/download/%s/%s' "$GITHUB_REPO" "$VERSION" "$asset"
+}
+
+download_package() {
+  local asset archive
+  asset="fyss-master-linux-${arch_name}.tar.gz"
+  archive="${WORK_DIR}/${asset}"
+  if [ -z "$PACKAGE_URL" ]; then
+    PACKAGE_URL="$(release_download_url "$asset")"
+  fi
+  info "下载安装包: ${PACKAGE_URL}"
+  curl -fL --retry 3 --retry-delay 2 "$PACKAGE_URL" -o "$archive" || fail "下载安装包失败。请确认 GitHub Release 已发布 ${asset}"
+  tar -xzf "$archive" -C "$WORK_DIR"
+  [ -x "${WORK_DIR}/bin/proxy-control" ] || fail "安装包缺少主控二进制: bin/proxy-control"
+  [ -d "${WORK_DIR}/frontend/dist" ] || fail "安装包缺少前端静态文件: frontend/dist"
+  [ -x "${WORK_DIR}/scripts/install-master.sh" ] || fail "安装包缺少安装器: scripts/install-master.sh"
 }
 
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
@@ -134,9 +160,9 @@ normalize_arch
 info "开始安装 fyss 主控"
 echo "系统: ${release}"
 echo "架构: ${arch_name}"
+echo "安装流程: 下载二进制包 -> 安装主控二进制 -> 安装前端 dist -> 注册 systemd"
 ensure_dependencies
 
 WORK_DIR="$(mktemp -d)"
-info "拉取安装仓库: ${REPO_URL} (${REPO_REF})"
-git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$WORK_DIR"
-"$WORK_DIR/scripts/install-master.sh" "$@"
+download_package
+"$WORK_DIR/scripts/install-master.sh" --prebuilt-dir "$WORK_DIR" "$@"

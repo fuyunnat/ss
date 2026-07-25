@@ -18,6 +18,7 @@ NODE_NAME="${PROXY_CONTROL_NODE_NAME:-$(hostname)}"
 NODE_REGION="${PROXY_CONTROL_NODE_REGION:-}"
 NODE_HOST="${PROXY_CONTROL_NODE_HOST:-}"
 HEARTBEAT_INTERVAL="${PROXY_CONTROL_HEARTBEAT_INTERVAL:-30s}"
+PREBUILT_DIR="${PROXY_CONTROL_PREBUILT_DIR:-}"
 ACTION="install"
 
 usage() {
@@ -27,6 +28,7 @@ Proxy Control Agent 安装器
 用法:
   sudo ./scripts/install-agent.sh --master-url URL --token TOKEN [--node-name NAME] [--region REGION] [--node-host HOST]
   sudo ./scripts/install-agent.sh --uninstall
+  sudo ./scripts/install-agent.sh --prebuilt-dir /path/to/package --master-url URL --token TOKEN
 
 安装后管理命令:
   fyss              显示管理菜单
@@ -62,6 +64,7 @@ while [ "$#" -gt 0 ]; do
     --region) NODE_REGION="${2:-}"; shift 2 ;;
     --node-host) NODE_HOST="${2:-}"; shift 2 ;;
     --interval) HEARTBEAT_INTERVAL="${2:-}"; shift 2 ;;
+    --prebuilt-dir) PREBUILT_DIR="${2:-}"; shift 2 ;;
     --uninstall) ACTION="uninstall"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) fail "未知参数: $1" ;;
@@ -77,7 +80,10 @@ require_systemd() {
 }
 
 require_go() {
-  command -v go >/dev/null 2>&1 || fail "未检测到 Go。请先安装 Go 1.22 或更高版本，或使用根目录 install-agent.sh 自动安装依赖"
+  if [ -n "$PREBUILT_DIR" ]; then
+    return
+  fi
+  command -v go >/dev/null 2>&1 || fail "未检测到 Go。本地源码安装才需要 Go；线上请使用根目录 install-agent.sh 下载二进制包安装"
 }
 
 prompt_value() {
@@ -140,11 +146,18 @@ write_config() {
 
 build_agent() {
   local script_dir repo_root
+  mkdir -p "$INSTALL_DIR"
+  if [ -n "$PREBUILT_DIR" ]; then
+    [ -x "${PREBUILT_DIR}/bin/proxy-control-agent" ] || fail "预编译包缺少 Agent 二进制: ${PREBUILT_DIR}/bin/proxy-control-agent"
+    info "安装 Agent 二进制: ${INSTALL_DIR}/proxy-control-agent"
+    install -m 0755 "${PREBUILT_DIR}/bin/proxy-control-agent" "${INSTALL_DIR}/proxy-control-agent"
+    return
+  fi
+
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   repo_root="$(cd "${script_dir}/.." && pwd)"
-  mkdir -p "$INSTALL_DIR"
   cd "${repo_root}/backend"
-  info "构建 proxy-control-agent"
+  info "本地编译 Agent: ${INSTALL_DIR}/proxy-control-agent"
   go build -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/proxy-control-agent" ./cmd/agent
   chmod 0755 "${INSTALL_DIR}/proxy-control-agent"
 }
@@ -320,6 +333,9 @@ EOF
 
 copy_source_for_update() {
   local script_dir repo_root target
+  if [ -n "$PREBUILT_DIR" ]; then
+    return
+  fi
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   repo_root="$(cd "${script_dir}/.." && pwd -P)"
   target="${INSTALL_DIR}/source"
@@ -338,9 +354,13 @@ start_service() {
 
 print_result() {
   echo
-  info "Proxy Control Agent 安装完成，服务已启动"
-  echo "----------------------------------------------"
-  echo "fyss              - 显示管理菜单"
+	info "Proxy Control Agent 安装完成，服务已启动"
+	echo "----------------------------------------------"
+	echo "安装目录: ${INSTALL_DIR}"
+	echo "Agent 二进制: ${INSTALL_DIR}/proxy-control-agent"
+	echo "systemd 服务: proxy-control-agent"
+	echo "节点名称: ${NODE_NAME}"
+	echo "fyss              - 显示管理菜单"
   echo "fyss status       - 查看 Agent 状态"
   echo "fyss restart      - 重启 Agent"
   echo "fyss log          - 查看实时日志"

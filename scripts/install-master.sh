@@ -18,6 +18,7 @@ ADMIN_USERNAME="${PROXY_CONTROL_ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${PROXY_CONTROL_ADMIN_PASSWORD:-admin}"
 AGENT_TOKEN="${PROXY_CONTROL_AGENT_TOKEN:-}"
 SESSION_SECRET="${PROXY_CONTROL_SESSION_SECRET:-}"
+PREBUILT_DIR="${PROXY_CONTROL_PREBUILT_DIR:-}"
 ACTION="install"
 
 usage() {
@@ -27,6 +28,7 @@ Proxy Control 主控安装器
 用法:
   sudo ./scripts/install-master.sh [--http-addr :8080] [--admin-user admin] [--admin-password admin] [--agent-token TOKEN]
   sudo ./scripts/install-master.sh --uninstall
+  sudo ./scripts/install-master.sh --prebuilt-dir /path/to/package
 
 安装后管理命令:
   fyss              显示管理菜单
@@ -61,6 +63,7 @@ while [ "$#" -gt 0 ]; do
     --admin-password) ADMIN_PASSWORD="${2:-}"; shift 2 ;;
     --agent-token) AGENT_TOKEN="${2:-}"; shift 2 ;;
     --session-secret) SESSION_SECRET="${2:-}"; shift 2 ;;
+    --prebuilt-dir) PREBUILT_DIR="${2:-}"; shift 2 ;;
     --uninstall) ACTION="uninstall"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) fail "未知参数: $1" ;;
@@ -72,9 +75,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 require_commands() {
-  command -v systemctl >/dev/null 2>&1 || fail "当前系统未检测到 systemd，无法安装为系统服务"
-  command -v go >/dev/null 2>&1 || fail "未检测到 Go。请使用根目录 install-master.sh 自动安装依赖"
-  command -v npm >/dev/null 2>&1 || fail "未检测到 npm。请使用根目录 install-master.sh 自动安装依赖"
+	command -v systemctl >/dev/null 2>&1 || fail "当前系统未检测到 systemd，无法安装为系统服务"
 }
 
 generate_secret() {
@@ -118,17 +119,29 @@ write_config() {
 
 build_master() {
   local script_dir repo_root
+  mkdir -p "${INSTALL_DIR}/bin" "${INSTALL_DIR}/frontend"
+  if [ -n "$PREBUILT_DIR" ]; then
+    [ -x "${PREBUILT_DIR}/bin/proxy-control" ] || fail "预编译包缺少主控二进制: ${PREBUILT_DIR}/bin/proxy-control"
+    [ -d "${PREBUILT_DIR}/frontend/dist" ] || fail "预编译包缺少前端静态文件: ${PREBUILT_DIR}/frontend/dist"
+    info "安装主控二进制: ${INSTALL_DIR}/bin/proxy-control"
+    install -m 0755 "${PREBUILT_DIR}/bin/proxy-control" "${INSTALL_DIR}/bin/proxy-control"
+    info "安装前端静态文件: ${INSTALL_DIR}/frontend/dist"
+    rm -rf "${INSTALL_DIR}/frontend/dist"
+    cp -a "${PREBUILT_DIR}/frontend/dist" "${INSTALL_DIR}/frontend/dist"
+    return
+  fi
+
+  command -v go >/dev/null 2>&1 || fail "未检测到 Go。本地源码安装才需要 Go；线上请使用根目录 install-master.sh 下载二进制包安装"
+  command -v npm >/dev/null 2>&1 || fail "未检测到 npm。本地源码安装才需要 npm；线上请使用根目录 install-master.sh 下载二进制包安装"
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   repo_root="$(cd "${script_dir}/.." && pwd)"
-
-  mkdir -p "${INSTALL_DIR}/bin" "${INSTALL_DIR}/frontend"
   cd "${repo_root}/backend"
-  info "构建主控后端"
+  info "本地编译主控后端: ${INSTALL_DIR}/bin/proxy-control"
   go build -trimpath -ldflags="-s -w" -o "${INSTALL_DIR}/bin/proxy-control" .
   chmod 0755 "${INSTALL_DIR}/bin/proxy-control"
 
   cd "${repo_root}/frontend"
-  info "构建主控前端"
+  info "本地构建主控前端: ${INSTALL_DIR}/frontend/dist"
   if [ -f package-lock.json ]; then
     npm ci
   else
@@ -330,11 +343,15 @@ print_result() {
   fi
 
   echo
-  info "Proxy Control 主控安装完成，服务已启动"
-  echo "----------------------------------------------"
-  echo "访问地址: ${display_addr}"
-  echo "默认账号: ${ADMIN_USERNAME}"
-  echo "默认密码: ${ADMIN_PASSWORD}"
+	info "Proxy Control 主控安装完成，服务已启动"
+	echo "----------------------------------------------"
+	echo "安装目录: ${INSTALL_DIR}"
+	echo "主控二进制: ${INSTALL_DIR}/bin/proxy-control"
+	echo "前端静态文件: ${INSTALL_DIR}/frontend/dist"
+	echo "systemd 服务: proxy-control"
+	echo "访问地址: ${display_addr}"
+	echo "默认账号: ${ADMIN_USERNAME}"
+	echo "默认密码: ${ADMIN_PASSWORD}"
   echo "Agent Token: ${AGENT_TOKEN}"
   echo "----------------------------------------------"
   echo "fyss              - 显示管理菜单"

@@ -12,6 +12,26 @@
 curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh | sudo bash
 ```
 
+这个命令不是现场编译。服务器不需要 Go、Node、npm。
+
+脚本会从 GitHub Release 下载已经编译好的 Linux 安装包，然后安装：
+
+```text
+Go 主控二进制 -> /opt/proxy-control/bin/proxy-control
+前端静态文件 -> /opt/proxy-control/frontend/dist
+配置文件     -> /etc/proxy-control/master.env
+数据目录     -> /var/lib/proxy-control
+系统服务     -> proxy-control.service
+管理命令     -> /usr/bin/fyss
+```
+
+需要指定版本时：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh \
+  | sudo env PROXY_CONTROL_VERSION=v0.1.0 bash
+```
+
 安装完成后打开：
 
 ```text
@@ -56,6 +76,24 @@ curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-m
     --token 主控_AGENT_TOKEN \
     --node-name hk-01 \
     --region HK
+```
+
+被控端也不需要 Go 环境。脚本会下载已经编译好的 Agent 安装包，并安装为系统服务：
+
+```text
+Agent 二进制 -> /opt/proxy-control-agent/proxy-control-agent
+配置文件     -> /etc/proxy-control/agent.env
+系统服务     -> proxy-control-agent.service
+管理命令     -> /usr/bin/fyss
+```
+
+二进制安装包由 GitHub Actions 在发布 tag 时生成：
+
+```text
+fyss-master-linux-amd64.tar.gz
+fyss-master-linux-arm64.tar.gz
+fyss-agent-linux-amd64.tar.gz
+fyss-agent-linux-arm64.tar.gz
 ```
 
 被控端管理命令：
