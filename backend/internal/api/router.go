@@ -27,6 +27,7 @@ type Options struct {
 
 type Router struct {
 	store               *store.FileStore
+	configMu            sync.RWMutex
 	httpAddr            string
 	corsOrigin          string
 	dataDir             string
@@ -61,6 +62,16 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	if opts.AIModel == "" {
 		opts.AIModel = "gpt-4o-mini"
 	}
+	httpAddr := strings.TrimSpace(opts.HTTPAddr)
+	corsOrigin := strings.TrimSpace(opts.CORSAllowOrigin)
+	frontendDir := strings.TrimSpace(opts.FrontendDir)
+	if consoleConfig, ok := st.ConsoleConfig(); ok {
+		if strings.TrimSpace(consoleConfig.HTTPAddr) != "" {
+			httpAddr = strings.TrimSpace(consoleConfig.HTTPAddr)
+		}
+		corsOrigin = strings.TrimSpace(consoleConfig.CORSAllowOrigin)
+		frontendDir = strings.TrimSpace(consoleConfig.FrontendDir)
+	}
 	adminUsername := opts.AdminUsername
 	adminPassword := opts.AdminPassword
 	var adminHash string
@@ -87,10 +98,10 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 
 	r := &Router{
 		store:               st,
-		httpAddr:            opts.HTTPAddr,
-		corsOrigin:          opts.CORSAllowOrigin,
+		httpAddr:            httpAddr,
+		corsOrigin:          corsOrigin,
 		dataDir:             opts.DataDir,
-		frontendDir:         opts.FrontendDir,
+		frontendDir:         frontendDir,
 		agentToken:          opts.AgentToken,
 		adminUsername:       adminUsername,
 		adminPassword:       adminPassword,
@@ -110,6 +121,7 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	mux.HandleFunc("/api/auth/login", r.handleLogin)
 	mux.HandleFunc("/api/auth/me", r.handleMe)
 	mux.HandleFunc("/api/settings", r.handleSettings)
+	mux.HandleFunc("/api/settings/console", r.handleConsoleSettings)
 	mux.HandleFunc("/api/settings/admin", r.handleAdminSettings)
 	mux.HandleFunc("/api/settings/ai", r.handleAISettings)
 	mux.HandleFunc("/api/ai/chat", r.handleAIChat)
@@ -127,7 +139,7 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	mux.HandleFunc("/api/tasks", r.handleTasks)
 	mux.HandleFunc("/api/tasks/", r.handleTaskByID)
 
-	return withCORS(r.withAuth(mux), opts.CORSAllowOrigin)
+	return r.withCORS(r.withAuth(mux))
 }
 
 func (r *Router) handleHealth(w http.ResponseWriter, req *http.Request) {
@@ -369,10 +381,11 @@ func pathID(path string, prefix string) string {
 	return strings.Trim(strings.TrimPrefix(path, prefix), "/")
 }
 
-func withCORS(next http.Handler, allowOrigin string) http.Handler {
+func (r *Router) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		allowOrigin := r.consoleConfigSnapshot().CORSAllowOrigin
 		origin := req.Header.Get("Origin")
-		if allowOrigin == "*" || origin == allowOrigin {
+		if allowOrigin != "" && (allowOrigin == "*" || origin == allowOrigin) {
 			w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
 		}
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")

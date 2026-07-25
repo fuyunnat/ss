@@ -85,6 +85,25 @@ func (s *FileStore) SaveAIConfig(input AIConfig) error {
 	return s.saveLocked()
 }
 
+func (s *FileStore) ConsoleConfig() (ConsoleConfig, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.state.Console == nil || (s.state.Console.HTTPAddr == "" && s.state.Console.CORSAllowOrigin == "" && s.state.Console.FrontendDir == "") {
+		return ConsoleConfig{}, false
+	}
+	return *s.state.Console, true
+}
+
+func (s *FileStore) SaveConsoleConfig(input ConsoleConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	input.UpdatedAt = time.Now().UTC()
+	s.state.Console = &input
+	return s.saveLocked()
+}
+
 func (s *FileStore) ListServers() []ServerNode {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

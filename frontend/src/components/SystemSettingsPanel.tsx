@@ -15,12 +15,23 @@ interface SystemSettingsPanelProps {
 
 export function SystemSettingsPanel({ copyText, installCommand, settings, onNotice, onSessionChange, onRefresh }: SystemSettingsPanelProps) {
   const loaded = Boolean(settings);
+  const [consoleForm, setConsoleForm] = useState({ httpAddr: settings?.httpAddr || ':8080', corsAllowOrigin: settings?.corsAllowOrigin || '', frontendDir: settings?.frontendDir || '' });
+  const [consoleSaving, setConsoleSaving] = useState(false);
+  const [consoleError, setConsoleError] = useState('');
   const [adminForm, setAdminForm] = useState({ username: settings?.adminUsername || 'admin', currentPassword: '', newPassword: '', confirmPassword: '' });
   const [adminSaving, setAdminSaving] = useState(false);
   const [adminError, setAdminError] = useState('');
   const [aiForm, setAIForm] = useState({ baseUrl: settings?.aiBaseUrl || '', apiKey: '', model: settings?.aiModel || 'gpt-4o-mini' });
   const [aiSaving, setAISaving] = useState(false);
   const [aiError, setAIError] = useState('');
+
+  useEffect(() => {
+    setConsoleForm({
+      httpAddr: settings?.httpAddr || ':8080',
+      corsAllowOrigin: settings?.corsAllowOrigin || '',
+      frontendDir: settings?.frontendDir || '',
+    });
+  }, [settings?.corsAllowOrigin, settings?.frontendDir, settings?.httpAddr]);
 
   useEffect(() => {
     setAdminForm((current) => ({ ...current, username: settings?.adminUsername || current.username || 'admin' }));
@@ -37,6 +48,25 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
   async function copy(text: string) {
     await navigator.clipboard?.writeText(text);
     onNotice(copyText('已复制', 'Copied'));
+  }
+
+  async function saveConsole(event: FormEvent) {
+    event.preventDefault();
+    setConsoleError('');
+    setConsoleSaving(true);
+    try {
+      await api.updateConsoleSettings({
+        httpAddr: consoleForm.httpAddr.trim(),
+        corsAllowOrigin: consoleForm.corsAllowOrigin.trim(),
+        frontendDir: consoleForm.frontendDir.trim(),
+      });
+      await onRefresh();
+      onNotice(copyText('控制台配置已保存', 'Console settings saved'));
+    } catch (err) {
+      setConsoleError(err instanceof Error ? err.message : copyText('保存失败', 'Save failed'));
+    } finally {
+      setConsoleSaving(false);
+    }
   }
 
   async function saveAdmin(event: FormEvent) {
@@ -137,6 +167,37 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
           ]}
         />
       </section>
+
+      <form className="admin-credentials console-credentials" onSubmit={saveConsole}>
+        <div className="sub-panel-head">
+          <div>
+            <strong>{copyText('控制台配置', 'Console Config')}</strong>
+            <span>{copyText('修改主控监听、跨域来源和前端托管目录。', 'Change master listen address, CORS origin, and frontend hosting directory.')}</span>
+          </div>
+        </div>
+        <div className="admin-fields console-fields">
+          <label className="field">
+            <span>{copyText('监听地址', 'Listen Address')}</span>
+            <input value={consoleForm.httpAddr} onChange={(event) => setConsoleForm({ ...consoleForm, httpAddr: event.target.value })} required placeholder=":8080" disabled={!loaded || consoleSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('跨域来源', 'CORS Origin')}</span>
+            <input value={consoleForm.corsAllowOrigin} onChange={(event) => setConsoleForm({ ...consoleForm, corsAllowOrigin: event.target.value })} placeholder="http://localhost:5173 或 *" disabled={!loaded || consoleSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('前端托管目录', 'Frontend Directory')}</span>
+            <input value={consoleForm.frontendDir} onChange={(event) => setConsoleForm({ ...consoleForm, frontendDir: event.target.value })} placeholder={copyText('留空关闭后端托管', 'Blank disables backend hosting')} disabled={!loaded || consoleSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('数据目录', 'Data Directory')}</span>
+            <input value={settings?.dataDir || ''} disabled readOnly />
+          </label>
+        </div>
+        <div className="admin-form-footer">
+          <span>{consoleError || copyText('CORS 立即生效；监听地址和前端托管目录保存后重启主控生效。', 'CORS applies immediately; listen address and frontend directory apply after master restart.')}</span>
+          <button className="primary-button compact" type="submit" disabled={!loaded || consoleSaving}><Save size={15} />{consoleSaving ? copyText('保存中', 'Saving') : copyText('保存控制台配置', 'Save Console Config')}</button>
+        </div>
+      </form>
 
       <form className="admin-credentials ai-credentials" onSubmit={saveAI}>
         <div className="sub-panel-head">

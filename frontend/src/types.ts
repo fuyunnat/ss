@@ -140,6 +140,7 @@ export interface SystemSettings {
   httpAddr: string;
   corsAllowOrigin: string;
   dataDir: string;
+  frontendDir: string;
   frontendEnabled: boolean;
   adminUsername: string;
   defaultAdminPassword: boolean;
@@ -159,6 +160,12 @@ export interface AdminCredentialsUpdate {
   username: string;
   currentPassword: string;
   newPassword: string;
+}
+
+export interface ConsoleSettingsUpdate {
+  httpAddr: string;
+  corsAllowOrigin: string;
+  frontendDir: string;
 }
 
 export interface AISettingsUpdate {

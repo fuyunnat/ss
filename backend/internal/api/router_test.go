@@ -434,6 +434,67 @@ func TestAISettingsPersistAndConfigureProvider(t *testing.T) {
 	}
 }
 
+func TestConsoleSettingsPersistAndUpdateRuntimeCORS(t *testing.T) {
+	path := t.TempDir() + "/state.json"
+	st, err := store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/console", strings.NewReader(`{"httpAddr":"0.0.0.0:18080","corsAllowOrigin":"https://panel.example.com","frontendDir":"/opt/fyss/frontend"}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected update status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	for _, want := range []string{`"httpAddr":"0.0.0.0:18080"`, `"corsAllowOrigin":"https://panel.example.com"`, `"frontendDir":"/opt/fyss/frontend"`, `"frontendEnabled":true`} {
+		if !strings.Contains(res.Body.String(), want) {
+			t.Fatalf("expected console update response to contain %s, got %s", want, res.Body.String())
+		}
+	}
+
+	req = httptest.NewRequest(http.MethodOptions, "/api/settings", nil)
+	req.Header.Set("Origin", "https://panel.example.com")
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent || res.Header().Get("Access-Control-Allow-Origin") != "https://panel.example.com" {
+		t.Fatalf("expected runtime cors update, status=%d origin=%q", res.Code, res.Header().Get("Access-Control-Allow-Origin"))
+	}
+
+	reopened, err := store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("reopen store: %v", err)
+	}
+	consoleConfig, ok := reopened.ConsoleConfig()
+	if !ok || consoleConfig.HTTPAddr != "0.0.0.0:18080" || consoleConfig.CORSAllowOrigin != "https://panel.example.com" || consoleConfig.FrontendDir != "/opt/fyss/frontend" {
+		t.Fatalf("unexpected persisted console config: ok=%v config=%+v", ok, consoleConfig)
+	}
+}
+
+func TestConsoleSettingsRejectInvalidValues(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	for _, body := range []string{
+		`{"httpAddr":"8080","corsAllowOrigin":"https://panel.example.com","frontendDir":"/opt/fyss/frontend"}`,
+		`{"httpAddr":":8080","corsAllowOrigin":"ftp://panel.example.com","frontendDir":"/opt/fyss/frontend"}`,
+		`{"httpAddr":":8080","corsAllowOrigin":"https://panel.example.com","frontendDir":"relative/dist"}`,
+	} {
+		req := httptest.NewRequest(http.MethodPut, "/api/settings/console", strings.NewReader(body))
+		authorize(req, token)
+		res := httptest.NewRecorder()
+		router.ServeHTTP(res, req)
+		if res.Code != http.StatusBadRequest {
+			t.Fatalf("expected invalid console config status 400, got %d: %s", res.Code, res.Body.String())
+		}
+	}
+}
+
 func TestSettingsDoesNotExposeSecrets(t *testing.T) {
 	st, err := store.NewFileStore(t.TempDir() + "/state.json")
 	if err != nil {

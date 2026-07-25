@@ -24,6 +24,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("open store: %v", err)
 	}
+	if consoleConfig, ok := st.ConsoleConfig(); ok {
+		if strings.TrimSpace(consoleConfig.HTTPAddr) != "" {
+			cfg.HTTPAddr = strings.TrimSpace(consoleConfig.HTTPAddr)
+		}
+		cfg.CORSAllowOrigin = strings.TrimSpace(consoleConfig.CORSAllowOrigin)
+		cfg.FrontendDir = strings.TrimSpace(consoleConfig.FrontendDir)
+	}
 
 	handler := api.NewRouter(st, api.Options{
 		CORSAllowOrigin: cfg.CORSAllowOrigin,

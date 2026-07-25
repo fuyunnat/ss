@@ -92,13 +92,14 @@ type TaskLog struct {
 }
 
 type State struct {
-	Servers  []ServerNode `json:"servers"`
-	Gateways []Gateway    `json:"gateways"`
-	Exits    []ExitNode   `json:"exits"`
-	Policies []Policy     `json:"policies"`
-	Tasks    []Task       `json:"tasks"`
-	Admin    *AdminConfig `json:"admin,omitempty"`
-	AI       *AIConfig    `json:"ai,omitempty"`
+	Servers  []ServerNode   `json:"servers"`
+	Gateways []Gateway      `json:"gateways"`
+	Exits    []ExitNode     `json:"exits"`
+	Policies []Policy       `json:"policies"`
+	Tasks    []Task         `json:"tasks"`
+	Admin    *AdminConfig   `json:"admin,omitempty"`
+	AI       *AIConfig      `json:"ai,omitempty"`
+	Console  *ConsoleConfig `json:"console,omitempty"`
 }
 
 type Summary struct {
@@ -123,4 +124,11 @@ type AIConfig struct {
 	APIKey    string    `json:"apiKey,omitempty"`
 	Model     string    `json:"model"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type ConsoleConfig struct {
+	HTTPAddr        string    `json:"httpAddr"`
+	CORSAllowOrigin string    `json:"corsAllowOrigin"`
+	FrontendDir     string    `json:"frontendDir"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 }

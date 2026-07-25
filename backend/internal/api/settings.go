@@ -1,8 +1,11 @@
 package api
 
 import (
+	"errors"
+	"net"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"proxy-control/backend/internal/store"
@@ -12,6 +15,7 @@ type settingsResponse struct {
 	HTTPAddr             string `json:"httpAddr"`
 	CORSAllowOrigin      string `json:"corsAllowOrigin"`
 	DataDir              string `json:"dataDir"`
+	FrontendDir          string `json:"frontendDir"`
 	FrontendEnabled      bool   `json:"frontendEnabled"`
 	AdminUsername        string `json:"adminUsername"`
 	DefaultAdminPassword bool   `json:"defaultAdminPassword"`
@@ -39,19 +43,27 @@ type aiSettingsRequest struct {
 	Model   string `json:"model"`
 }
 
+type consoleSettingsRequest struct {
+	HTTPAddr        string `json:"httpAddr"`
+	CORSAllowOrigin string `json:"corsAllowOrigin"`
+	FrontendDir     string `json:"frontendDir"`
+}
+
 func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		methodNotAllowed(w)
 		return
 	}
 	adminUsername, defaultAdminPassword := r.adminSettingsSummary()
+	consoleConfig := r.consoleConfigSnapshot()
 	aiConfig := r.aiConfigSnapshot()
 
 	writeJSON(w, http.StatusOK, settingsResponse{
-		HTTPAddr:             r.httpAddr,
-		CORSAllowOrigin:      r.corsOrigin,
+		HTTPAddr:             consoleConfig.HTTPAddr,
+		CORSAllowOrigin:      consoleConfig.CORSAllowOrigin,
 		DataDir:              r.dataDir,
-		FrontendEnabled:      r.frontendDir != "",
+		FrontendDir:          consoleConfig.FrontendDir,
+		FrontendEnabled:      consoleConfig.FrontendDir != "",
 		AdminUsername:        adminUsername,
 		DefaultAdminPassword: defaultAdminPassword,
 		AgentTokenConfigured: r.agentToken != "",
@@ -65,6 +77,90 @@ func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 		MasterServiceName:    "proxy-control",
 		AgentServiceName:     "proxy-control-agent",
 	})
+}
+
+func (r *Router) consoleConfigSnapshot() store.ConsoleConfig {
+	r.configMu.RLock()
+	defer r.configMu.RUnlock()
+
+	return store.ConsoleConfig{
+		HTTPAddr:        strings.TrimSpace(r.httpAddr),
+		CORSAllowOrigin: strings.TrimSpace(r.corsOrigin),
+		FrontendDir:     strings.TrimSpace(r.frontendDir),
+	}
+}
+
+func (r *Router) handleConsoleSettings(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPut {
+		methodNotAllowed(w)
+		return
+	}
+
+	var input consoleSettingsRequest
+	if !decodeJSON(w, req, &input) {
+		return
+	}
+	httpAddr := strings.TrimSpace(input.HTTPAddr)
+	corsOrigin := strings.TrimSpace(input.CORSAllowOrigin)
+	frontendDir := strings.TrimSpace(input.FrontendDir)
+	if err := validateHTTPAddr(httpAddr); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateCORSOrigin(corsOrigin); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if frontendDir != "" && !filepath.IsAbs(frontendDir) {
+		writeError(w, http.StatusBadRequest, "前端托管目录必须是绝对路径，或留空关闭托管")
+		return
+	}
+
+	next := store.ConsoleConfig{
+		HTTPAddr:        httpAddr,
+		CORSAllowOrigin: corsOrigin,
+		FrontendDir:     frontendDir,
+	}
+	if err := r.store.SaveConsoleConfig(next); err != nil {
+		writeError(w, http.StatusInternalServerError, "保存控制台配置失败")
+		return
+	}
+
+	r.configMu.Lock()
+	r.httpAddr = next.HTTPAddr
+	r.corsOrigin = next.CORSAllowOrigin
+	r.frontendDir = next.FrontendDir
+	r.configMu.Unlock()
+
+	writeJSON(w, http.StatusOK, settingsResponse{
+		HTTPAddr:        next.HTTPAddr,
+		CORSAllowOrigin: next.CORSAllowOrigin,
+		DataDir:         r.dataDir,
+		FrontendDir:     next.FrontendDir,
+		FrontendEnabled: next.FrontendDir != "",
+	})
+}
+
+func validateHTTPAddr(value string) error {
+	if value == "" {
+		return errors.New("监听地址不能为空")
+	}
+	_, port, err := net.SplitHostPort(value)
+	if err != nil || port == "" {
+		return errors.New("监听地址必须是 host:port 格式，例如 :8080 或 0.0.0.0:8080")
+	}
+	return nil
+}
+
+func validateCORSOrigin(value string) error {
+	if value == "" || value == "*" {
+		return nil
+	}
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return errors.New("跨域来源必须是 http/https 地址、* 或留空")
+	}
+	return nil
 }
 
 func (r *Router) adminSettingsSummary() (string, bool) {
