@@ -11,6 +11,28 @@ This project is a new management system. It uses mature proxy cores such as Xray
 - task execution records
 - traffic and health model hooks
 
+## Master One-Click Install
+
+Install the control panel on a Linux master server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh | sudo bash
+```
+
+After installation:
+
+```bash
+proxy-control              # show management menu
+proxy-control status       # service status
+proxy-control restart      # restart panel
+proxy-control log          # live logs
+proxy-control config       # change port, admin account, Agent Token
+proxy-control update       # update from GitHub installer
+proxy-control uninstall    # uninstall panel
+```
+
+Default login is `admin / admin`. The installer generates an Agent Token and prints it at the end. Use `proxy-control config` after installation to change the default password and token.
+
 ## Beginner Flow
 
 The panel is organized around the shortest usable path:

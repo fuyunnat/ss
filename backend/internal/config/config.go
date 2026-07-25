@@ -8,6 +8,7 @@ import (
 type Config struct {
 	HTTPAddr        string
 	CORSAllowOrigin string
+	FrontendDir     string
 	AgentToken      string
 	DataDir         string
 	StatePath       string
@@ -24,6 +25,7 @@ func Load() Config {
 	return Config{
 		HTTPAddr:        getenv("PROXY_CONTROL_HTTP_ADDR", ":8080"),
 		CORSAllowOrigin: getenv("PROXY_CONTROL_CORS_ORIGIN", "http://localhost:5173"),
+		FrontendDir:     os.Getenv("PROXY_CONTROL_FRONTEND_DIR"),
 		AgentToken:      os.Getenv("PROXY_CONTROL_AGENT_TOKEN"),
 		DataDir:         dataDir,
 		StatePath:       filepath.Join(dataDir, "state.json"),

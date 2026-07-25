@@ -72,6 +72,7 @@ function App() {
   const t = messages[locale];
   const isZh = locale === 'zh-CN';
   const copyText = (zh: string, en: string) => (isZh ? zh : en);
+  const masterInstallCommand = 'curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-master.sh | sudo bash';
   const installCommand = 'curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh | sudo bash -s -- --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK';
 
   const navItems = useMemo(() => [
@@ -406,6 +407,11 @@ function App() {
           copyText={copyText}
           onlineServers={onlineServers}
           exitCount={summary.exitCount}
+          masterInstallCommand={masterInstallCommand}
+          onCopyMasterInstall={async () => {
+            await navigator.clipboard?.writeText(masterInstallCommand);
+            showNotice(copyText('主控安装命令已复制', 'Master install command copied'));
+          }}
           onOpenServers={() => setActive('servers')}
           onOpenNodes={() => setActive('exits')}
           onOpenTasks={() => setActive('tasks')}
