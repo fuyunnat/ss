@@ -30,7 +30,7 @@ import { BeginnerFlow } from './components/BeginnerFlow';
 import { GatewayBuilder, entrySummary, gatewayProtocolDefaults, withLegacyPorts } from './components/GatewayBuilder';
 import { LoginPanel } from './components/LoginPanel';
 import { ProtocolBuilder } from './components/ProtocolBuilder';
-import { Field, StatusBadge } from './components/ui';
+import { CustomSelect, Field, StatusBadge } from './components/ui';
 import { numberValue, panelDesc, readLocale, shortID, splitList, taskStatusLabel, taskTargetLabel, taskTypeMeta, type ActiveTab } from './appHelpers';
 import { messages, type Locale } from './i18n';
 import { policyMatchMeta, policyMatchOptions, policyMatchSummary, policyStrategyMeta, policyStrategyOptions } from './policyOptions';
@@ -453,7 +453,14 @@ function App() {
                   <form className="control-form" onSubmit={saveExit}>
                     <Field label={t.common.name}><input value={exitForm.name} onChange={(e) => setExitForm({ ...exitForm, name: e.target.value })} required placeholder={t.forms.exitName} /></Field>
                     <div className="form-row">
-                      <Field label={t.common.type}><select value={exitForm.type} onChange={(e) => setExitForm({ ...exitForm, type: e.target.value })}><option>external_socks5</option><option>external_http</option><option>self_xray</option><option>self_singbox</option></select></Field>
+                      <Field label={t.common.type}>
+                        <CustomSelect
+                          ariaLabel={t.common.type}
+                          value={exitForm.type}
+                          options={['external_socks5', 'external_http', 'self_xray', 'self_singbox']}
+                          onChange={(type) => setExitForm({ ...exitForm, type })}
+                        />
+                      </Field>
                       <Field label={t.forms.region}><input value={exitForm.region} onChange={(e) => setExitForm({ ...exitForm, region: e.target.value })} placeholder={copyText('HK / JP / US', 'HK / JP / US')} /></Field>
                     </div>
                     <div className="form-row">
@@ -477,14 +484,15 @@ function App() {
                 <Field label={copyText('规则名称', 'Rule Name')}><input value={policyForm.name} onChange={(e) => setPolicyForm({ ...policyForm, name: e.target.value })} required placeholder={copyText('例如：默认出口规则', 'e.g. Default exit rule')} /></Field>
                 <div className="form-row">
                   <Field label={copyText('适用流量', 'Traffic Scope')}>
-                    <select value={policyForm.matchType} onChange={(e) => setPolicyForm({ ...policyForm, matchType: e.target.value, matchValue: e.target.value === 'default' ? '*' : policyForm.matchValue === '*' ? '' : policyForm.matchValue })}>
-                      {policyMatchOptions(copyText).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                    </select>
+                    <CustomSelect
+                      ariaLabel={copyText('适用流量', 'Traffic Scope')}
+                      value={policyForm.matchType}
+                      options={policyMatchOptions(copyText)}
+                      onChange={(matchType) => setPolicyForm({ ...policyForm, matchType, matchValue: matchType === 'default' ? '*' : policyForm.matchValue === '*' ? '' : policyForm.matchValue })}
+                    />
                   </Field>
                   <Field label={copyText('出口选择', 'Exit Selection')}>
-                    <select value={policyForm.strategy} onChange={(e) => setPolicyForm({ ...policyForm, strategy: e.target.value })}>
-                      {policyStrategyOptions(copyText).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                    </select>
+                    <CustomSelect ariaLabel={copyText('出口选择', 'Exit Selection')} value={policyForm.strategy} options={policyStrategyOptions(copyText)} onChange={(strategy) => setPolicyForm({ ...policyForm, strategy })} />
                   </Field>
                 </div>
                 {policyForm.matchType !== 'default' && (
@@ -518,14 +526,15 @@ function App() {
                 </div>
                 <div className="form-row">
                   <Field label={t.common.type}>
-                    <select value={taskForm.type} onChange={(e) => setTaskForm({ ...taskForm, type: e.target.value, summary: taskForm.summary || taskTypeMeta(e.target.value, copyText).summary })}>
-                      {taskTypes.map((type) => <option key={type} value={type}>{taskTypeMeta(type, copyText).label}</option>)}
-                    </select>
+                    <CustomSelect
+                      ariaLabel={t.common.type}
+                      value={taskForm.type}
+                      options={taskTypes.map((type) => ({ value: type, label: taskTypeMeta(type, copyText).label }))}
+                      onChange={(type) => setTaskForm({ ...taskForm, type, summary: taskForm.summary || taskTypeMeta(type, copyText).summary })}
+                    />
                   </Field>
                   <Field label={t.common.target}>
-                    <select value={taskForm.targetType} onChange={(e) => setTaskForm({ ...taskForm, targetType: e.target.value })}>
-                      {taskTargets.map((target) => <option key={target} value={target}>{taskTargetLabel(target, copyText)}</option>)}
-                    </select>
+                    <CustomSelect ariaLabel={t.common.target} value={taskForm.targetType} options={taskTargets.map((target) => ({ value: target, label: taskTargetLabel(target, copyText) }))} onChange={(targetType) => setTaskForm({ ...taskForm, targetType })} />
                   </Field>
                 </div>
                 <Field label={t.forms.targetId}><input value={taskForm.targetId} onChange={(e) => setTaskForm({ ...taskForm, targetId: e.target.value })} placeholder={t.forms.targetId} /></Field>

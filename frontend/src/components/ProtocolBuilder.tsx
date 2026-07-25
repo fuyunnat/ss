@@ -2,7 +2,7 @@ import { FormEvent } from 'react';
 import { Copy, Server, Zap } from 'lucide-react';
 import type { ProtocolForm, ServerNode } from '../types';
 import { buildProtocolShareInfo } from '../protocolLinks';
-import { Field, StatusBadge } from './ui';
+import { CustomSelect, Field, StatusBadge } from './ui';
 
 export type ProtocolPreset = {
   protocol: string;
@@ -128,11 +128,9 @@ export function ProtocolBuilder({
         <div className="form-row three">
           <Field label={copyText('节点名称', 'Node Name')}><input value={form.name} onChange={(event) => update({ name: event.target.value })} required placeholder="hk-vless-01" /></Field>
           <Field label={copyText('协议', 'Protocol')}>
-            <select value={form.protocol} onChange={(event) => updateProtocol(event.target.value)}>
-              {presets.map((preset) => <option key={`${preset.protocol}-${preset.core}-${preset.security}`} value={preset.protocol}>{preset.label}</option>)}
-            </select>
+            <CustomSelect ariaLabel={copyText('协议', 'Protocol')} value={form.protocol} options={presets.map((preset) => ({ value: preset.protocol, label: preset.label }))} onChange={updateProtocol} />
           </Field>
-          <Field label={copyText('核心', 'Core')}><select value={form.core} onChange={(event) => update({ core: event.target.value })}><option>xray</option><option>sing-box</option></select></Field>
+          <Field label={copyText('核心', 'Core')}><CustomSelect ariaLabel={copyText('核心', 'Core')} value={form.core} options={['xray', 'sing-box']} onChange={(core) => update({ core })} /></Field>
         </div>
         <div className="form-row three">
           <Field label={copyText('监听 IP', 'Listen IP')}><input value={form.listenIp} onChange={(event) => update({ listenIp: event.target.value })} placeholder={copyText('留空监听所有地址', 'Blank listens on all addresses')} /></Field>
@@ -147,7 +145,7 @@ export function ProtocolBuilder({
             <div className="form-row three">
               <Field label={copyText('目标地址', 'Target Address')}><input value={form.targetAddress} onChange={(event) => update({ targetAddress: event.target.value })} required placeholder="127.0.0.1" /></Field>
               <Field label={copyText('目标端口', 'Target Port')}><input value={form.targetPort || ''} onChange={(event) => update({ targetPort: numberValue(event.target.value) })} type="number" min="1" required placeholder="80" /></Field>
-              <Field label={copyText('网络', 'Network')}><select value={form.network} onChange={(event) => update({ network: event.target.value })}><option>tcp+udp</option><option>tcp</option><option>udp</option></select></Field>
+              <Field label={copyText('网络', 'Network')}><CustomSelect ariaLabel={copyText('网络', 'Network')} value={form.network} options={networkOptions} onChange={(network) => update({ network })} /></Field>
             </div>
           </section>
         ) : isSS ? (
@@ -155,12 +153,10 @@ export function ProtocolBuilder({
             <ProtocolSectionTitle title="Shadowsocks" desc={copyText('配置加密方式、密码和 TCP/UDP 网络。', 'Configure method, password, and TCP/UDP network.')} />
             <div className="form-row three">
               <Field label={copyText('加密方式', 'Method')}>
-                <select value={form.method} onChange={(event) => update({ method: event.target.value })}>
-                  {ssMethods.map((method) => <option key={method} value={method}>{method}</option>)}
-                </select>
+                <CustomSelect ariaLabel={copyText('加密方式', 'Method')} value={form.method} options={ssMethods} onChange={(method) => update({ method })} />
               </Field>
               <Field label={copyText('密码', 'Password')}><input value={form.password} onChange={(event) => update({ password: event.target.value })} required /></Field>
-              <Field label={copyText('网络', 'Network')}><select value={form.network} onChange={(event) => update({ network: event.target.value })}><option>tcp+udp</option><option>tcp</option><option>udp</option></select></Field>
+              <Field label={copyText('网络', 'Network')}><CustomSelect ariaLabel={copyText('网络', 'Network')} value={form.network} options={networkOptions} onChange={(network) => update({ network })} /></Field>
             </div>
           </section>
         ) : isSocks ? (
@@ -197,21 +193,21 @@ export function ProtocolBuilder({
               {(isVless || isVmess) && <Field label="UUID"><input value={form.credential} onChange={(event) => update({ credential: event.target.value })} required placeholder={copyText('留空由 Agent 生成', 'Blank lets agent generate')} /></Field>}
               {isTrojan && <Field label={copyText('密码', 'Password')}><input value={form.password} onChange={(event) => update({ password: event.target.value })} required type="password" /></Field>}
               {isVmess && <Field label={copyText('额外 ID', 'Alter ID')}><input value={form.extraId} onChange={(event) => update({ extraId: numberValue(event.target.value) })} type="number" min="0" /></Field>}
-              {canUseStream && <Field label={copyText('传输', 'Transport')}><select value={form.transport} onChange={(event) => update({ transport: event.target.value })}>{transportOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>}
-              {canUseStream && <Field label={copyText('安全', 'Security')}><select value={form.security} onChange={(event) => update({ security: event.target.value, tls: event.target.value === 'tls' })}>{securityOptions(form.protocol).map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>}
+              {canUseStream && <Field label={copyText('传输', 'Transport')}><CustomSelect ariaLabel={copyText('传输', 'Transport')} value={form.transport} options={transportOptions} onChange={(transport) => update({ transport })} /></Field>}
+              {canUseStream && <Field label={copyText('安全', 'Security')}><CustomSelect ariaLabel={copyText('安全', 'Security')} value={form.security} options={securityOptions(form.protocol)} onChange={(security) => update({ security, tls: security === 'tls' })} /></Field>}
             </div>
             {showReality && (
               <div className="form-row three">
                 <Field label="Public Key"><input value={form.realityPublicKey} onChange={(event) => update({ realityPublicKey: event.target.value })} placeholder={copyText('Agent 生成后回填', 'Filled after agent generates')} /></Field>
                 <Field label="Short ID"><input value={form.realityShortId} onChange={(event) => update({ realityShortId: event.target.value })} placeholder="0123456789abcdef" /></Field>
-                <Field label="Fingerprint"><select value={form.fingerprint} onChange={(event) => update({ fingerprint: event.target.value })}><option>chrome</option><option>firefox</option><option>safari</option><option>randomized</option></select></Field>
+                <Field label="Fingerprint"><CustomSelect ariaLabel="Fingerprint" value={form.fingerprint} options={fingerprintOptions} onChange={(fingerprint) => update({ fingerprint })} /></Field>
               </div>
             )}
             {(showSni || showPath || isVless) && (
               <div className="form-row three">
                 {showSni && <Field label="SNI"><input value={form.sni} onChange={(event) => update({ sni: event.target.value })} placeholder="www.cloudflare.com" /></Field>}
                 {showPath && <Field label={form.transport === 'grpc' ? 'ServiceName' : copyText('路径', 'Path')}><input value={form.path} onChange={(event) => update({ path: event.target.value })} placeholder={form.transport === 'grpc' ? 'grpc-service' : '/proxy'} /></Field>}
-                {isVless && <Field label="Flow"><select value={form.flow} onChange={(event) => update({ flow: event.target.value })}><option value="">{copyText('无', 'None')}</option><option value="xtls-rprx-vision">xtls-rprx-vision</option></select></Field>}
+                {isVless && <Field label="Flow"><CustomSelect ariaLabel="Flow" value={form.flow} options={[{ value: '', label: copyText('无', 'None') }, 'xtls-rprx-vision']} onChange={(flow) => update({ flow })} /></Field>}
               </div>
             )}
             <div className="toggle-grid two">
@@ -278,6 +274,8 @@ function numberValue(value: string) {
 
 const ssMethods = ['aes-128-gcm', 'aes-256-gcm', 'chacha20-ietf-poly1305', 'xchacha20-ietf-poly1305'];
 const transportOptions = ['tcp', 'ws', 'grpc', 'httpupgrade'];
+const networkOptions = ['tcp+udp', 'tcp', 'udp'];
+const fingerprintOptions = ['chrome', 'firefox', 'safari', 'randomized'];
 
 function securityOptions(protocol: string) {
   if (protocol === 'vless') return ['reality', 'tls', 'none'];

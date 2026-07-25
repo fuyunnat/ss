@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Clipboard, Play, ShieldCheck } from 'lucide-react';
 import { api } from '../api';
 import type { AgentInstallRequest } from '../types';
-import { Field } from './ui';
+import { CustomSelect, Field } from './ui';
 
 type CopyText = (zh: string, en: string) => string;
 
@@ -78,11 +78,16 @@ export function AgentAutoOnline({ copyText, installCommand, onCopied, onInstalle
           </div>
           <div className="form-row">
             <Field label={copyText('认证方式', 'Auth Method')}>
-              <select value={form.authMethod} onChange={(event) => update({ authMethod: event.target.value as AgentInstallRequest['authMethod'], sshPassword: '', privateKey: '' })}>
-                <option value="agent">{copyText('使用总控 SSH Key / ssh-agent', 'Use master SSH key / ssh-agent')}</option>
-                <option value="private_key">{copyText('粘贴私钥，本次使用', 'Paste private key for this run')}</option>
-                <option value="password">{copyText('SSH 密码，本次使用', 'SSH password for this run')}</option>
-              </select>
+              <CustomSelect
+                ariaLabel={copyText('认证方式', 'Auth Method')}
+                value={form.authMethod}
+                options={[
+                  { value: 'agent', label: copyText('使用总控 SSH Key / ssh-agent', 'Use master SSH key / ssh-agent') },
+                  { value: 'private_key', label: copyText('粘贴私钥，本次使用', 'Paste private key for this run') },
+                  { value: 'password', label: copyText('SSH 密码，本次使用', 'SSH password for this run') },
+                ]}
+                onChange={(value) => update({ authMethod: value as AgentInstallRequest['authMethod'], sshPassword: '', privateKey: '' })}
+              />
             </Field>
             <Field label={copyText('上报地址', 'Reported Host')}><input value={form.nodeHost} onChange={(event) => update({ nodeHost: event.target.value })} placeholder={copyText('留空自动探测公网 IP', 'Blank auto-detects public IP')} /></Field>
           </div>

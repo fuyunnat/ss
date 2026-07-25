@@ -2,7 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Bot, Play, Send, ServerCog, Sparkles } from 'lucide-react';
 import { api } from '../api';
 import type { AgentInstallRequest, AIAction, AIChatResponse } from '../types';
-import { Field } from './ui';
+import { CustomSelect, Field } from './ui';
 
 interface AIAssistantProps {
   copyText: (zh: string, en: string) => string;
@@ -112,11 +112,16 @@ export function AIAssistant({ copyText, onError, onNotice, onRefresh }: AIAssist
             <Field label={copyText('默认地区', 'Default Region')}><input value={batchDefaults.region} onChange={(event) => updateDefaults({ region: event.target.value })} placeholder="HK" /></Field>
           </div>
           <Field label={copyText('认证方式', 'Auth Method')}>
-            <select value={batchDefaults.authMethod} onChange={(event) => updateDefaults({ authMethod: event.target.value as AgentInstallRequest['authMethod'], sshPassword: '', privateKey: '' })}>
-              <option value="agent">{copyText('使用总控 SSH Key / ssh-agent', 'Use master SSH key / ssh-agent')}</option>
-              <option value="private_key">{copyText('粘贴私钥，本次批量使用', 'Paste private key for this batch')}</option>
-              <option value="password">{copyText('SSH 密码，本次批量使用', 'SSH password for this batch')}</option>
-            </select>
+            <CustomSelect
+              ariaLabel={copyText('认证方式', 'Auth Method')}
+              value={batchDefaults.authMethod}
+              options={[
+                { value: 'agent', label: copyText('使用总控 SSH Key / ssh-agent', 'Use master SSH key / ssh-agent') },
+                { value: 'private_key', label: copyText('粘贴私钥，本次批量使用', 'Paste private key for this batch') },
+                { value: 'password', label: copyText('SSH 密码，本次批量使用', 'SSH password for this batch') },
+              ]}
+              onChange={(value) => updateDefaults({ authMethod: value as AgentInstallRequest['authMethod'], sshPassword: '', privateKey: '' })}
+            />
           </Field>
           {batchDefaults.authMethod === 'password' && (
             <Field label={copyText('SSH 密码', 'SSH Password')}><input value={batchDefaults.sshPassword} onChange={(event) => updateDefaults({ sshPassword: event.target.value })} type="password" /></Field>
