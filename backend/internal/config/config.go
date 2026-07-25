@@ -24,7 +24,7 @@ func Load() Config {
 	dataDir := getenv("PROXY_CONTROL_DATA_DIR", "../data")
 	return Config{
 		HTTPAddr:        getenv("PROXY_CONTROL_HTTP_ADDR", ":8080"),
-		CORSAllowOrigin: getenv("PROXY_CONTROL_CORS_ORIGIN", "http://localhost:5173"),
+		CORSAllowOrigin: os.Getenv("PROXY_CONTROL_CORS_ORIGIN"),
 		FrontendDir:     os.Getenv("PROXY_CONTROL_FRONTEND_DIR"),
 		AgentToken:      os.Getenv("PROXY_CONTROL_AGENT_TOKEN"),
 		DataDir:         dataDir,

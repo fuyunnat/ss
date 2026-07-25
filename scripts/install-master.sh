@@ -105,7 +105,7 @@ write_config() {
   mkdir -p "$CONFIG_DIR" "$DATA_DIR"
   {
     write_env_line "PROXY_CONTROL_HTTP_ADDR" "$HTTP_ADDR"
-    write_env_line "PROXY_CONTROL_CORS_ORIGIN" "*"
+    write_env_line "PROXY_CONTROL_CORS_ORIGIN" ""
     write_env_line "PROXY_CONTROL_FRONTEND_DIR" "${INSTALL_DIR}/frontend/dist"
     write_env_line "PROXY_CONTROL_DATA_DIR" "$DATA_DIR"
     write_env_line "PROXY_CONTROL_ADMIN_USERNAME" "$ADMIN_USERNAME"
@@ -252,7 +252,7 @@ config_master() {
   cors_origin="$(read_config_value PROXY_CONTROL_CORS_ORIGIN)"
   {
     write_env_line "PROXY_CONTROL_HTTP_ADDR" "$http_addr"
-    write_env_line "PROXY_CONTROL_CORS_ORIGIN" "${cors_origin:-*}"
+    write_env_line "PROXY_CONTROL_CORS_ORIGIN" "$cors_origin"
     write_env_line "PROXY_CONTROL_FRONTEND_DIR" "$frontend_dir"
     write_env_line "PROXY_CONTROL_DATA_DIR" "$data_dir"
     write_env_line "PROXY_CONTROL_ADMIN_USERNAME" "$admin_user"

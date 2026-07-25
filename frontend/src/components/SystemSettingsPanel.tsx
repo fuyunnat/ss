@@ -155,6 +155,7 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
 
   const masterCommand = settings?.masterConfigCommand || 'fyss';
   const agentCommand = settings?.agentConfigCommand || 'fyss';
+  const corsDisplay = settings?.corsAllowOrigin || copyText('自动跟随访问来源', 'Auto current origin');
 
   return (
     <div className="settings-page">
@@ -166,7 +167,7 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
           good={Boolean(settings)}
           rows={[
             [copyText('监听地址', 'Listen Address'), settings?.httpAddr || '-'],
-            [copyText('跨域来源', 'CORS Origin'), settings?.corsAllowOrigin || '-'],
+            [copyText('跨域来源', 'CORS Origin'), loaded ? corsDisplay : '-'],
             [copyText('数据目录', 'Data Directory'), settings?.dataDir || '-'],
             [copyText('前端托管', 'Frontend Hosting'), !loaded ? '-' : settings?.frontendEnabled ? copyText('已启用', 'Enabled') : copyText('未启用', 'Disabled')],
           ]}
@@ -211,7 +212,7 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
         <div className="sub-panel-head">
           <div>
             <strong>{copyText('控制台配置', 'Console Config')}</strong>
-            <span>{copyText('修改主控监听、跨域来源和前端托管目录。', 'Change master listen address, CORS origin, and frontend hosting directory.')}</span>
+            <span>{copyText('跨域默认自动适配当前访问来源，也可以手动锁定固定来源。', 'CORS follows the current panel origin by default, or can be pinned manually.')}</span>
           </div>
         </div>
         <div className="admin-fields console-fields">
@@ -221,7 +222,7 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
           </label>
           <label className="field">
             <span>{copyText('跨域来源', 'CORS Origin')}</span>
-            <input value={consoleForm.corsAllowOrigin} onChange={(event) => setConsoleForm({ ...consoleForm, corsAllowOrigin: event.target.value })} placeholder="http://localhost:5173 或 *" disabled={!loaded || consoleSaving} />
+            <input value={consoleForm.corsAllowOrigin} onChange={(event) => setConsoleForm({ ...consoleForm, corsAllowOrigin: event.target.value })} placeholder={copyText('留空自动适配当前访问域名，或填写固定来源 / *', 'Blank follows current panel origin, or enter a fixed origin / *')} disabled={!loaded || consoleSaving} />
           </label>
           <label className="field">
             <span>{copyText('前端托管目录', 'Frontend Directory')}</span>

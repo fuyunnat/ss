@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -412,8 +413,9 @@ func (r *Router) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		allowOrigin := r.consoleConfigSnapshot().CORSAllowOrigin
 		origin := req.Header.Get("Origin")
-		if allowOrigin != "" && (allowOrigin == "*" || origin == allowOrigin) {
-			w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		if headerOrigin := corsResponseOrigin(allowOrigin, origin); headerOrigin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", headerOrigin)
+			w.Header().Set("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -423,4 +425,30 @@ func (r *Router) withCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, req)
 	})
+}
+
+func corsResponseOrigin(configuredOrigin string, requestOrigin string) string {
+	configuredOrigin = strings.TrimSpace(configuredOrigin)
+	requestOrigin = strings.TrimSpace(requestOrigin)
+	if configuredOrigin == "*" {
+		return "*"
+	}
+	if configuredOrigin != "" {
+		if requestOrigin == configuredOrigin {
+			return configuredOrigin
+		}
+		return ""
+	}
+	if isHTTPOrigin(requestOrigin) {
+		return requestOrigin
+	}
+	return ""
+}
+
+func isHTTPOrigin(value string) bool {
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return false
+	}
+	return parsed.Scheme == "http" || parsed.Scheme == "https"
 }

@@ -582,6 +582,73 @@ func TestConsoleSettingsPersistAndUpdateRuntimeCORS(t *testing.T) {
 	}
 }
 
+func TestDefaultCORSAutoFollowsRequestOrigin(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router := NewRouter(st, Options{
+		AdminUsername: "admin",
+		AdminPassword: "admin",
+		SessionSecret: "test-session-secret",
+	})
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/settings", nil)
+	req.Header.Set("Origin", "https://panel.example.com")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent || res.Header().Get("Access-Control-Allow-Origin") != "https://panel.example.com" {
+		t.Fatalf("expected auto cors origin, status=%d origin=%q", res.Code, res.Header().Get("Access-Control-Allow-Origin"))
+	}
+
+	req = httptest.NewRequest(http.MethodOptions, "/api/settings", nil)
+	req.Header.Set("Origin", "file://panel")
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("expected invalid origin to be rejected, got %q", res.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestConfiguredCORSOriginModes(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router := NewRouter(st, Options{
+		CORSAllowOrigin: "https://panel.example.com",
+		AdminUsername:   "admin",
+		AdminPassword:   "admin",
+		SessionSecret:   "test-session-secret",
+	})
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/settings", nil)
+	req.Header.Set("Origin", "https://other.example.com")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("expected mismatched fixed origin to be rejected, got %q", res.Header().Get("Access-Control-Allow-Origin"))
+	}
+
+	st, err = store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router = NewRouter(st, Options{
+		CORSAllowOrigin: "*",
+		AdminUsername:   "admin",
+		AdminPassword:   "admin",
+		SessionSecret:   "test-session-secret",
+	})
+	req = httptest.NewRequest(http.MethodOptions, "/api/settings", nil)
+	req.Header.Set("Origin", "https://any.example.com")
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("expected wildcard cors origin, got %q", res.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
 func TestConsoleSettingsRejectInvalidValues(t *testing.T) {
 	st, err := store.NewFileStore(t.TempDir() + "/state.json")
 	if err != nil {
