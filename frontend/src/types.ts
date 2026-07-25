@@ -146,6 +146,7 @@ export interface SystemSettings {
   defaultAdminPassword: boolean;
   agentTokenConfigured: boolean;
   agentMasterUrl: string;
+  publicHost: string;
   aiConfigured: boolean;
   aiBaseUrl: string;
   aiApiKeyConfigured: boolean;

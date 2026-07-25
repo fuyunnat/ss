@@ -604,6 +604,40 @@ func TestConsoleSettingsRejectInvalidValues(t *testing.T) {
 	}
 }
 
+func TestPublicClientHostPrefersAgentMasterURL(t *testing.T) {
+	router := &Router{}
+	req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	req.Host = "panel.example.com:8080"
+
+	got := router.publicClientHost(req, store.AgentConfig{MasterURL: "https://master.example.net:8443"})
+	if got != "master.example.net" {
+		t.Fatalf("expected master URL host, got %q", got)
+	}
+}
+
+func TestPublicClientHostUsesProxyHeader(t *testing.T) {
+	router := &Router{}
+	req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	req.Host = "localhost:8080"
+	req.Header.Set("X-Forwarded-Host", "panel.example.com:443")
+
+	got := router.publicClientHost(req, store.AgentConfig{})
+	if got != "panel.example.com" {
+		t.Fatalf("expected forwarded host, got %q", got)
+	}
+}
+
+func TestPublicClientHostFallsBackToCachedDetectedHost(t *testing.T) {
+	router := &Router{publicHost: "198.51.100.10"}
+	req := httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	req.Host = "127.0.0.1:8080"
+
+	got := router.publicClientHost(req, store.AgentConfig{})
+	if got != "198.51.100.10" {
+		t.Fatalf("expected cached public host, got %q", got)
+	}
+}
+
 func TestSettingsDoesNotExposeSecrets(t *testing.T) {
 	st, err := store.NewFileStore(t.TempDir() + "/state.json")
 	if err != nil {

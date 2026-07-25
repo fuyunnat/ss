@@ -1,12 +1,16 @@
 package api
 
 import (
+	"context"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"proxy-control/backend/internal/store"
 )
@@ -21,6 +25,7 @@ type settingsResponse struct {
 	DefaultAdminPassword bool   `json:"defaultAdminPassword"`
 	AgentTokenConfigured bool   `json:"agentTokenConfigured"`
 	AgentMasterURL       string `json:"agentMasterUrl"`
+	PublicHost           string `json:"publicHost"`
 	AIConfigured         bool   `json:"aiConfigured"`
 	AIBaseURL            string `json:"aiBaseUrl"`
 	AIAPIKeyConfigured   bool   `json:"aiApiKeyConfigured"`
@@ -77,6 +82,7 @@ func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 		DefaultAdminPassword: defaultAdminPassword,
 		AgentTokenConfigured: agentConfig.Token != "",
 		AgentMasterURL:       agentConfig.MasterURL,
+		PublicHost:           r.publicClientHost(req, agentConfig),
 		AIConfigured:         aiConfig.configured(),
 		AIBaseURL:            aiConfig.BaseURL,
 		AIAPIKeyConfigured:   aiConfig.APIKey != "",
@@ -87,6 +93,112 @@ func (r *Router) handleSettings(w http.ResponseWriter, req *http.Request) {
 		MasterServiceName:    agentConfig.MasterServiceName,
 		AgentServiceName:     agentConfig.AgentServiceName,
 	})
+}
+
+func (r *Router) publicClientHost(req *http.Request, agentConfig store.AgentConfig) string {
+	if host := hostFromURL(agentConfig.MasterURL); host != "" {
+		return host
+	}
+	for _, header := range []string{"X-Forwarded-Host", "X-Real-Host"} {
+		if host := normalizeClientHost(req.Header.Get(header)); isUsableClientHost(host) {
+			return host
+		}
+	}
+	if host := normalizeClientHost(req.Host); isUsableClientHost(host) {
+		return host
+	}
+	return r.detectedPublicHost()
+}
+
+func (r *Router) detectedPublicHost() string {
+	r.publicHostMu.RLock()
+	if r.publicHost != "" {
+		defer r.publicHostMu.RUnlock()
+		return r.publicHost
+	}
+	r.publicHostMu.RUnlock()
+
+	r.publicHostMu.Lock()
+	defer r.publicHostMu.Unlock()
+	if r.publicHost != "" {
+		return r.publicHost
+	}
+	r.publicHost = detectPublicIP(r.httpClient)
+	return r.publicHost
+}
+
+func detectPublicIP(client *http.Client) string {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+	defer cancel()
+	for _, endpoint := range []string{"https://api.ipify.org", "https://ifconfig.me/ip"} {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			continue
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		body, readErr := io.ReadAll(io.LimitReader(res.Body, 128))
+		_ = res.Body.Close()
+		if readErr != nil || res.StatusCode < 200 || res.StatusCode >= 300 {
+			continue
+		}
+		host := strings.TrimSpace(string(body))
+		if net.ParseIP(host) != nil {
+			return host
+		}
+	}
+	return ""
+}
+
+func hostFromURL(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return ""
+	}
+	return normalizeClientHost(parsed.Host)
+}
+
+func normalizeClientHost(value string) string {
+	host := strings.TrimSpace(value)
+	if host == "" {
+		return ""
+	}
+	if first, _, ok := strings.Cut(host, ","); ok {
+		host = strings.TrimSpace(first)
+	}
+	if parsed, err := url.Parse(host); err == nil && parsed.Host != "" {
+		host = parsed.Host
+	}
+	host = strings.Trim(strings.Split(host, "/")[0], " ")
+	if splitHost, _, err := net.SplitHostPort(host); err == nil {
+		return strings.TrimPrefix(strings.TrimSuffix(splitHost, "]"), "[")
+	}
+	host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	if before, after, ok := strings.Cut(host, ":"); ok && !strings.Contains(after, ":") {
+		if port, err := strconv.Atoi(after); err == nil && port > 0 && port <= 65535 {
+			return before
+		}
+	}
+	return host
+}
+
+func isUsableClientHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip == nil || (!ip.IsLoopback() && !ip.IsUnspecified())
 }
 
 func (r *Router) consoleConfigSnapshot() store.ConsoleConfig {

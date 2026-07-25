@@ -49,6 +49,8 @@ type Router struct {
 	aiBaseURL           string
 	aiAPIKey            string
 	aiModel             string
+	publicHostMu        sync.RWMutex
+	publicHost          string
 	httpClient          *http.Client
 }
 

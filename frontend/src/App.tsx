@@ -81,6 +81,7 @@ function App() {
   const isZh = locale === 'zh-CN';
   const copyText = (zh: string, en: string) => (isZh ? zh : en);
   const installCommand = 'curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh | sudo bash -s -- --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK';
+  const gatewayClientHost = useMemo(() => resolveGatewayClientHost(settings), [settings?.agentMasterUrl, settings?.publicHost]);
 
   const navItems = useMemo(() => [
     { id: 'gateways' as const, label: t.nav.gateways, count: summary.gatewayCount, icon: Network, hint: copyText('入口监听', 'Entry listeners') },
@@ -436,6 +437,7 @@ function App() {
               <GatewayBuilder
                 copyText={copyText}
                 form={gatewayForm}
+                clientHost={gatewayClientHost}
                 onChange={setGatewayForm}
                 onSubmit={saveGateway}
                 onReset={() => setGatewayForm(createEmptyGateway())}
@@ -743,6 +745,25 @@ function buildDeploySummary(form: ProtocolForm, copyText: (zh: string, en: strin
     form.path && form.transport !== 'tcp' ? `path ${form.path}` : '',
     ...limits,
   ].filter(Boolean).join(' / ');
+}
+
+function resolveGatewayClientHost(settings: SystemSettings | null) {
+  return hostFromURL(settings?.agentMasterUrl || '') || settings?.publicHost || browserClientHost();
+}
+
+function hostFromURL(value: string) {
+  const raw = value.trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).hostname;
+  } catch {
+    return raw.replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+  }
+}
+
+function browserClientHost() {
+  if (typeof window === 'undefined') return '';
+  return window.location.hostname || '';
 }
 
 export default App;

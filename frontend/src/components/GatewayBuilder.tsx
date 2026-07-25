@@ -24,6 +24,7 @@ const legacyPorts: Record<string, number> = {
 type GatewayBuilderProps = {
   copyText: (zh: string, en: string) => string;
   form: Gateway;
+  clientHost: string;
   onChange: (next: Gateway) => void;
   onSubmit: (event: FormEvent) => void;
   onReset: () => void;
@@ -34,11 +35,11 @@ export function createGatewayProtocols(): ProtocolListener[] {
   return protocolTemplates.map((item) => withConnectionDefaults(item));
 }
 
-export function GatewayBuilder({ copyText, form, onChange, onSubmit, onReset, onCopyLink }: GatewayBuilderProps) {
+export function GatewayBuilder({ copyText, form, clientHost, onChange, onSubmit, onReset, onCopyLink }: GatewayBuilderProps) {
   const protocols = normalizeGatewayProtocols(form);
   const enabledCount = protocols.filter((item) => item.enabled).length;
   const isEditing = Boolean(form.id);
-  const connections = buildEntryConnections({ ...form, protocols }, copyText);
+  const connections = buildEntryConnections({ ...form, protocols }, copyText, clientHost);
 
   function update(patch: Partial<Gateway>) {
     onChange({ ...form, ...patch });
@@ -181,8 +182,8 @@ function withConnectionDefaults(item: ProtocolListener): ProtocolListener {
   return next;
 }
 
-function buildEntryConnections(gateway: Gateway, copyText: (zh: string, en: string) => string) {
-  const host = clientHost(gateway.listenHost);
+function buildEntryConnections(gateway: Gateway, copyText: (zh: string, en: string) => string, detectedHost: string) {
+  const host = clientHost(gateway.listenHost, detectedHost);
   return normalizeGatewayProtocols(gateway)
     .filter((item) => item.enabled && item.port > 0)
     .map((item) => {
@@ -233,10 +234,20 @@ function buildEntryConnections(gateway: Gateway, copyText: (zh: string, en: stri
     });
 }
 
-function clientHost(value: string) {
+function clientHost(value: string, detectedHost: string) {
   const host = value.trim();
-  if (!host || host === '0.0.0.0' || host === '::') return 'YOUR-MASTER-IP';
-  return host.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!host || host === '0.0.0.0' || host === '::') return normalizeHost(detectedHost) || 'localhost';
+  return normalizeHost(host) || host;
+}
+
+function normalizeHost(value: string) {
+  const raw = value.trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw.includes('://') ? raw : `http://${raw}`).hostname;
+  } catch {
+    return raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').split(':')[0];
+  }
 }
 
 function numberValue(value: string) {
