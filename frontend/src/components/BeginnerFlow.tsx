@@ -1,11 +1,7 @@
-import { Clipboard } from 'lucide-react';
-
 type BeginnerFlowProps = {
   copyText: (zh: string, en: string) => string;
   onlineServers: number;
   exitCount: number;
-  masterInstallCommand: string;
-  onCopyMasterInstall: () => void;
   onOpenServers: () => void;
   onOpenNodes: () => void;
   onOpenTasks: () => void;
@@ -15,8 +11,6 @@ export function BeginnerFlow({
   copyText,
   onlineServers,
   exitCount,
-  masterInstallCommand,
-  onCopyMasterInstall,
   onOpenServers,
   onOpenNodes,
   onOpenTasks,
@@ -26,12 +20,6 @@ export function BeginnerFlow({
       <div className="flow-title">
         <strong>{copyText('上线流程', 'Launch Flow')}</strong>
         <span>{copyText('接入 Agent 后部署协议，任务全程可追踪。', 'Enroll an agent, deploy a protocol, and audit every task.')}</span>
-        <div className="master-install-line">
-          <code>{masterInstallCommand}</code>
-          <button className="secondary-button compact" type="button" onClick={onCopyMasterInstall}>
-            <Clipboard size={14} />{copyText('复制主控安装', 'Copy master install')}
-          </button>
-        </div>
       </div>
       <div className="flow-cards">
         <article className={onlineServers > 0 ? 'flow-card done' : 'flow-card'}>
