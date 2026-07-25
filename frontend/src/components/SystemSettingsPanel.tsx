@@ -59,7 +59,7 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
   }, [settings?.agentMasterUrl]);
 
   async function copy(text: string) {
-    await navigator.clipboard?.writeText(text);
+    await writeClipboard(text);
     onNotice(copyText('已复制', 'Copied'));
   }
 
@@ -383,4 +383,24 @@ function CommandRow({ icon: Icon, label, command, copyLabel, onCopy }: { icon: L
       <button className="secondary-button compact" type="button" onClick={onCopy}><Clipboard size={14} />{copyLabel}</button>
     </div>
   );
+}
+
+async function writeClipboard(text: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // HTTP panels can miss Clipboard API permission; use the legacy copy path.
+  }
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', 'readonly');
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  document.body.removeChild(area);
 }

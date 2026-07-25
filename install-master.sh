@@ -27,6 +27,7 @@ GitHub 一键安装:
   下载已经编译好的 Linux 主控安装包，不在服务器上安装 Go、Node 或 npm。
   安装包内包含主控二进制和前端 dist，解压后安装到 /opt/proxy-control，
   并注册 systemd 服务。
+  会自动安装 Xray Core 作为主入口协议运行时。
   如果检测到已启用的 firewalld 或 ufw，会自动放行面板端口和默认主入口端口。
 
 安装完成后会自动打开 fyss 管理菜单；以后直接执行 fyss 进入菜单。
@@ -102,6 +103,7 @@ ensure_dependencies() {
   local missing=()
   command -v curl >/dev/null 2>&1 || missing+=("curl")
   command -v tar >/dev/null 2>&1 || missing+=("tar")
+  command -v unzip >/dev/null 2>&1 || missing+=("unzip")
   command -v systemctl >/dev/null 2>&1 || fail "当前系统未检测到 systemd，无法安装为系统服务"
 
   if [ "${#missing[@]}" -eq 0 ]; then
@@ -111,18 +113,19 @@ ensure_dependencies() {
   warn "检测到缺少依赖: ${missing[*]}，开始自动安装"
   case "$release" in
     ubuntu|debian)
-      install_packages ca-certificates curl tar
+      install_packages ca-certificates curl tar unzip
       ;;
     centos|fedora|rocky|almalinux|rhel)
-      install_packages ca-certificates curl tar
+      install_packages ca-certificates curl tar unzip
       ;;
     *)
-      install_packages ca-certificates curl tar
+      install_packages ca-certificates curl tar unzip
       ;;
   esac
 
   command -v curl >/dev/null 2>&1 || fail "curl 安装失败"
   command -v tar >/dev/null 2>&1 || fail "tar 安装失败"
+  command -v unzip >/dev/null 2>&1 || fail "unzip 安装失败"
 }
 
 release_download_url() {

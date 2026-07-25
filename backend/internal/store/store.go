@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -207,6 +208,36 @@ func (s *FileStore) ListGateways() []Gateway {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return cloneSlice(s.state.Gateways)
+}
+
+func (s *FileStore) EnsureDefaultGateway() (Gateway, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.state.Gateways) > 0 {
+		return Gateway{}, false, nil
+	}
+	now := time.Now().UTC()
+	item := Gateway{
+		ID:         newID(),
+		Name:       "main-entry",
+		ListenHost: "0.0.0.0",
+		SocksPort:  30004,
+		HTTPPort:   30005,
+		Status:     "active",
+		Protocols: []ProtocolListener{
+			{Protocol: "vless", Port: 30000, Enabled: true, Credential: newUUID()},
+			{Protocol: "vmess", Port: 30001, Enabled: true, Credential: newUUID()},
+			{Protocol: "trojan", Port: 30002, Enabled: true, Password: newToken(16)},
+			{Protocol: "shadowsocks", Port: 30003, Enabled: true, Method: "chacha20-ietf-poly1305", Password: newToken(16), Network: "tcp+udp"},
+			{Protocol: "socks5", Port: 30004, Enabled: true, AuthUser: "fyss", Password: newToken(12)},
+			{Protocol: "http", Port: 30005, Enabled: true, AuthUser: "fyss", Password: newToken(12)},
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	s.state.Gateways = append(s.state.Gateways, item)
+	return item, true, s.saveLocked()
 }
 
 func (s *FileStore) UpsertGateway(input Gateway) (Gateway, error) {
@@ -489,6 +520,27 @@ func newID() string {
 		return time.Now().UTC().Format("20060102150405.000000000")
 	}
 	return hex.EncodeToString(buf[:])
+}
+
+func newToken(size int) string {
+	if size <= 0 {
+		size = 16
+	}
+	buf := make([]byte, size)
+	if _, err := rand.Read(buf); err != nil {
+		return newID() + newID()
+	}
+	return hex.EncodeToString(buf)[:size]
+}
+
+func newUUID() string {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return fmt.Sprintf("%s-%s-%s-%s-%s", newID()[:8], newID()[:4], newID()[:4], newID()[:4], newID()[:12])
+	}
+	buf[6] = (buf[6] & 0x0f) | 0x40
+	buf[8] = (buf[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", buf[0:4], buf[4:6], buf[6:8], buf[8:10], buf[10:16])
 }
 
 func defaultString(value string, fallback string) string {

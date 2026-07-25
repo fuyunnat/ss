@@ -60,3 +60,39 @@ func TestUpsertServerMergesAgentHeartbeatByNameAndHost(t *testing.T) {
 		t.Fatalf("unexpected merged server: first=%+v second=%+v items=%+v", first, second, items)
 	}
 }
+
+func TestEnsureDefaultGatewayCreatesEntryProtocols(t *testing.T) {
+	st, err := NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	gateway, created, err := st.EnsureDefaultGateway()
+	if err != nil {
+		t.Fatalf("ensure default gateway: %v", err)
+	}
+	if !created {
+		t.Fatal("expected default gateway to be created")
+	}
+	if gateway.Name != "main-entry" || gateway.ListenHost != "0.0.0.0" || len(gateway.Protocols) != 6 {
+		t.Fatalf("unexpected default gateway: %+v", gateway)
+	}
+	ports := map[string]int{}
+	for _, protocol := range gateway.Protocols {
+		ports[protocol.Protocol] = protocol.Port
+		if !protocol.Enabled {
+			t.Fatalf("expected protocol enabled: %+v", protocol)
+		}
+	}
+	if ports["vless"] != 30000 || ports["vmess"] != 30001 || ports["trojan"] != 30002 || ports["shadowsocks"] != 30003 || ports["socks5"] != 30004 || ports["http"] != 30005 {
+		t.Fatalf("unexpected default ports: %+v", ports)
+	}
+
+	_, created, err = st.EnsureDefaultGateway()
+	if err != nil {
+		t.Fatalf("second ensure default gateway: %v", err)
+	}
+	if created {
+		t.Fatal("expected second ensure to keep existing gateway")
+	}
+}

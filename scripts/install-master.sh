@@ -46,6 +46,9 @@ Proxy Control 主控安装器
 防火墙:
   默认自动放行面板端口和主入口端口 30000-30005。
   如需关闭自动放行: PROXY_CONTROL_FIREWALL_OPEN=0
+
+主入口:
+  自动安装 Xray Core，主控用它监听 VLESS、VMess、Trojan、Shadowsocks、SOCKS5、HTTP 入口。
 EOF
 }
 
@@ -162,6 +165,39 @@ open_firewall() {
   fi
 
   warn "未检测到启用的 firewalld/ufw，跳过系统防火墙自动放行"
+}
+
+xray_asset() {
+  case "$(uname -m)" in
+    x86_64|x64|amd64) printf 'Xray-linux-64.zip' ;;
+    aarch64|arm64) printf 'Xray-linux-arm64-v8a.zip' ;;
+    *) return 1 ;;
+  esac
+}
+
+install_xray() {
+  if command -v xray >/dev/null 2>&1; then
+    info "检测到 Xray: $(command -v xray)"
+    return
+  fi
+  command -v curl >/dev/null 2>&1 || fail "未检测到 curl，无法安装 Xray"
+  command -v unzip >/dev/null 2>&1 || fail "未检测到 unzip，无法安装 Xray"
+
+  local asset url tmp archive
+  asset="$(xray_asset)" || fail "当前架构暂不支持自动安装 Xray: $(uname -m)"
+  url="https://github.com/XTLS/Xray-core/releases/latest/download/${asset}"
+  tmp="$(mktemp -d)"
+  archive="${tmp}/${asset}"
+  info "安装 Xray Core: ${url}"
+  curl -fL --retry 3 --retry-delay 2 "$url" -o "$archive" || fail "下载 Xray 失败"
+  unzip -q "$archive" -d "$tmp" || fail "解压 Xray 失败"
+  [ -x "${tmp}/xray" ] || fail "Xray 安装包缺少 xray 二进制"
+  install -m 0755 "${tmp}/xray" /usr/local/bin/xray
+  mkdir -p /usr/local/share/xray
+  [ -f "${tmp}/geoip.dat" ] && install -m 0644 "${tmp}/geoip.dat" /usr/local/share/xray/geoip.dat
+  [ -f "${tmp}/geosite.dat" ] && install -m 0644 "${tmp}/geosite.dat" /usr/local/share/xray/geosite.dat
+  rm -rf "$tmp"
+  info "Xray Core 已安装: /usr/local/bin/xray"
 }
 
 build_master() {
@@ -484,6 +520,7 @@ main() {
   validate_config
   write_config
   build_master
+  install_xray
   write_service
   write_manager
   open_firewall

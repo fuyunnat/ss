@@ -19,11 +19,14 @@ curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-m
 ```text
 Go 主控二进制 -> /opt/proxy-control/bin/proxy-control
 前端静态文件 -> /opt/proxy-control/frontend/dist
+Xray 运行时  -> /usr/local/bin/xray
 配置文件     -> /etc/proxy-control/master.env
 数据目录     -> /var/lib/proxy-control
 系统服务     -> proxy-control.service
 管理命令     -> /usr/bin/fyss
 ```
+
+首次启动时会自动创建默认主入口 `main-entry`，并生成 VLESS、VMess、Trojan、Shadowsocks、SOCKS5、HTTP 的连接信息。主控会写入 `/var/lib/proxy-control/xray-entry.json` 并启动 Xray 监听 `30000-30005`。
 
 如果服务器启用了 `firewalld` 或 `ufw`，主控安装脚本会自动放行：
 

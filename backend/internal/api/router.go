@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +54,8 @@ type Router struct {
 	publicHostMu        sync.RWMutex
 	publicHost          string
 	httpClient          *http.Client
+	gatewayRuntimeMu    sync.Mutex
+	gatewayRuntimeCmd   *exec.Cmd
 }
 
 func NewRouter(st *store.FileStore, opts Options) http.Handler {
@@ -140,6 +143,10 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 		aiAPIKey:            aiAPIKey,
 		aiModel:             aiModel,
 		httpClient:          &http.Client{Timeout: 20 * time.Second},
+	}
+	if r.dataDir != "" {
+		r.ensureDefaultGateway()
+		r.reloadGatewayRuntime()
 	}
 	mux := http.NewServeMux()
 
@@ -251,6 +258,9 @@ func (r *Router) handleGateways(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		item, err := r.store.UpsertGateway(input)
+		if err == nil {
+			r.reloadGatewayRuntime()
+		}
 		writeResult(w, item, err)
 	default:
 		methodNotAllowed(w)
@@ -262,7 +272,11 @@ func (r *Router) handleGatewayByID(w http.ResponseWriter, req *http.Request) {
 		methodNotAllowed(w)
 		return
 	}
-	writeDelete(w, r.store.DeleteGateway(pathID(req.URL.Path, "/api/gateways/")))
+	err := r.store.DeleteGateway(pathID(req.URL.Path, "/api/gateways/"))
+	if err == nil {
+		r.reloadGatewayRuntime()
+	}
+	writeDelete(w, err)
 }
 
 func (r *Router) handleExits(w http.ResponseWriter, req *http.Request) {

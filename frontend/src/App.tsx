@@ -140,6 +140,12 @@ function App() {
     }
   }, [protocolForm.serverId, servers]);
 
+  useEffect(() => {
+    if (!gatewayForm.id && !gatewayForm.name && gateways.length > 0) {
+      setGatewayForm(withLegacyPorts(gateways[0]));
+    }
+  }, [gatewayForm.id, gatewayForm.name, gateways]);
+
   function setLocale(next: Locale) {
     setLocaleState(next);
     localStorage.setItem('proxy-control-locale', next);
@@ -339,12 +345,12 @@ function App() {
       showNotice(copyText('该节点缺少链接参数，请编辑后更新', 'This node is missing link parameters; edit and update it first'));
       return;
     }
-    await navigator.clipboard?.writeText(text);
+    await writeClipboard(text);
     showNotice(copyText('链接已复制', 'Link copied'));
   }
 
   async function copyInstallCommand() {
-    await navigator.clipboard?.writeText(installCommand);
+    await writeClipboard(installCommand);
     showNotice(t.app.copied);
   }
 
@@ -764,6 +770,26 @@ function hostFromURL(value: string) {
 function browserClientHost() {
   if (typeof window === 'undefined') return '';
   return window.location.hostname || '';
+}
+
+async function writeClipboard(text: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // HTTP panels can miss Clipboard API permission; use the legacy copy path.
+  }
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', 'readonly');
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  document.body.removeChild(area);
 }
 
 export default App;
