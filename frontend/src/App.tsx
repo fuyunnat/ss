@@ -565,6 +565,8 @@ function App() {
                 installCommand={installCommand}
                 settings={settings}
                 onNotice={showNotice}
+                onSessionChange={setSession}
+                onRefresh={refresh}
               />
             )}
           </section>

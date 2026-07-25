@@ -250,6 +250,94 @@ func TestLoginAndProtectedRoutes(t *testing.T) {
 	}
 }
 
+func TestAdminSettingsUpdatesCredentialsAndInvalidatesOldToken(t *testing.T) {
+	path := t.TempDir() + "/state.json"
+	st, err := store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/admin", strings.NewReader(`{"username":"owner","currentPassword":"admin","newPassword":"better-secret"}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected update status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	bodyText := res.Body.String()
+	if strings.Contains(bodyText, "better-secret") {
+		t.Fatalf("admin update leaked password: %s", bodyText)
+	}
+	var session authResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &session); err != nil {
+		t.Fatalf("decode session: %v", err)
+	}
+	if session.Token == "" || session.Username != "owner" {
+		t.Fatalf("unexpected update response: %#v", session)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/settings", nil)
+	authorize(req, token)
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old token status 401, got %d: %s", res.Code, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"owner","password":"better-secret"}`))
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected new login status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"admin","password":"admin"}`))
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected old login status 401, got %d", res.Code)
+	}
+
+	reopened, err := store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("reopen store: %v", err)
+	}
+	adminConfig, ok := reopened.AdminConfig()
+	if !ok {
+		t.Fatal("expected persisted admin config")
+	}
+	if adminConfig.Username != "owner" || adminConfig.PasswordHash == "" || adminConfig.PasswordSalt == "" {
+		t.Fatalf("unexpected persisted admin config: %+v", adminConfig)
+	}
+	if adminConfig.PasswordHash == "better-secret" || adminConfig.PasswordSalt == "better-secret" {
+		t.Fatalf("admin password persisted in plaintext: %+v", adminConfig)
+	}
+}
+
+func TestAdminSettingsRejectsWrongCurrentPassword(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/admin", strings.NewReader(`{"username":"owner","currentPassword":"wrong","newPassword":"better-secret"}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected wrong current password status 401, got %d: %s", res.Code, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"admin","password":"admin"}`))
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected old credentials to remain valid, got %d: %s", res.Code, res.Body.String())
+	}
+}
+
 func TestAIChatWithoutBackendConfig(t *testing.T) {
 	st, err := store.NewFileStore(t.TempDir() + "/state.json")
 	if err != nil {

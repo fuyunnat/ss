@@ -1,20 +1,57 @@
-import { Bot, CheckCircle2, Clipboard, KeyRound, LockKeyhole, ServerCog, Settings, ShieldAlert, Terminal } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Bot, CheckCircle2, Clipboard, KeyRound, LockKeyhole, Save, ServerCog, Settings, ShieldAlert, Terminal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { SystemSettings } from '../types';
+import { api, setAuthSession } from '../api';
+import type { AuthSession, SystemSettings } from '../types';
 
 interface SystemSettingsPanelProps {
   copyText: (zh: string, en: string) => string;
   installCommand: string;
   settings: SystemSettings | null;
   onNotice: (message: string) => void;
+  onSessionChange: (session: AuthSession) => void;
+  onRefresh: () => Promise<void>;
 }
 
-export function SystemSettingsPanel({ copyText, installCommand, settings, onNotice }: SystemSettingsPanelProps) {
+export function SystemSettingsPanel({ copyText, installCommand, settings, onNotice, onSessionChange, onRefresh }: SystemSettingsPanelProps) {
   const loaded = Boolean(settings);
+  const [adminForm, setAdminForm] = useState({ username: settings?.adminUsername || 'admin', currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [adminSaving, setAdminSaving] = useState(false);
+  const [adminError, setAdminError] = useState('');
+
+  useEffect(() => {
+    setAdminForm((current) => ({ ...current, username: settings?.adminUsername || current.username || 'admin' }));
+  }, [settings?.adminUsername]);
 
   async function copy(text: string) {
     await navigator.clipboard?.writeText(text);
     onNotice(copyText('已复制', 'Copied'));
+  }
+
+  async function saveAdmin(event: FormEvent) {
+    event.preventDefault();
+    setAdminError('');
+    if (adminForm.newPassword !== adminForm.confirmPassword) {
+      setAdminError(copyText('两次输入的新密码不一致', 'New passwords do not match'));
+      return;
+    }
+    setAdminSaving(true);
+    try {
+      const session = await api.updateAdminCredentials({
+        username: adminForm.username.trim(),
+        currentPassword: adminForm.currentPassword,
+        newPassword: adminForm.newPassword,
+      });
+      setAuthSession(session);
+      onSessionChange(session);
+      setAdminForm({ username: session.username, currentPassword: '', newPassword: '', confirmPassword: '' });
+      await onRefresh();
+      onNotice(copyText('管理员账号已更新', 'Admin account updated'));
+    } catch (err) {
+      setAdminError(err instanceof Error ? err.message : copyText('保存失败', 'Save failed'));
+    } finally {
+      setAdminSaving(false);
+    }
   }
 
   const masterCommand = settings?.masterConfigCommand || 'fyss';
@@ -69,6 +106,37 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
           ]}
         />
       </section>
+
+      <form className="admin-credentials" onSubmit={saveAdmin}>
+        <div className="sub-panel-head">
+          <div>
+            <strong>{copyText('管理员账号', 'Admin Account')}</strong>
+            <span>{copyText('修改登录账号和密码；保存后当前会话会自动刷新。', 'Change login username and password; current session refreshes after saving.')}</span>
+          </div>
+        </div>
+        <div className="admin-fields">
+          <label className="field">
+            <span>{copyText('登录账号', 'Username')}</span>
+            <input value={adminForm.username} onChange={(event) => setAdminForm({ ...adminForm, username: event.target.value })} required minLength={3} maxLength={64} disabled={!loaded || adminSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('当前密码', 'Current Password')}</span>
+            <input value={adminForm.currentPassword} onChange={(event) => setAdminForm({ ...adminForm, currentPassword: event.target.value })} required type="password" autoComplete="current-password" disabled={!loaded || adminSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('新密码', 'New Password')}</span>
+            <input value={adminForm.newPassword} onChange={(event) => setAdminForm({ ...adminForm, newPassword: event.target.value })} type="password" minLength={6} maxLength={128} autoComplete="new-password" placeholder={copyText('不填则只改账号', 'Leave blank to only change username')} disabled={!loaded || adminSaving} />
+          </label>
+          <label className="field">
+            <span>{copyText('确认新密码', 'Confirm Password')}</span>
+            <input value={adminForm.confirmPassword} onChange={(event) => setAdminForm({ ...adminForm, confirmPassword: event.target.value })} type="password" minLength={6} maxLength={128} autoComplete="new-password" disabled={!loaded || adminSaving || adminForm.newPassword === ''} />
+          </label>
+        </div>
+        <div className="admin-form-footer">
+          <span>{adminError || copyText('密码不会回显，也不会明文保存到状态文件。', 'Password is never echoed or saved in plaintext.')}</span>
+          <button className="primary-button compact" type="submit" disabled={!loaded || adminSaving}><Save size={15} />{adminSaving ? copyText('保存中', 'Saving') : copyText('保存账号', 'Save Account')}</button>
+        </div>
+      </form>
 
       <section className="settings-actions">
         <div className="sub-panel-head">

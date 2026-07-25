@@ -155,6 +155,12 @@ export interface SystemSettings {
   agentServiceName: string;
 }
 
+export interface AdminCredentialsUpdate {
+  username: string;
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface AIChatRequest {
   message: string;
 }

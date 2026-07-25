@@ -698,6 +698,7 @@ textarea {
 
 .setting-card,
 .settings-actions,
+.admin-credentials,
 .settings-note {
   min-width: 0;
   border: 1px solid #dce3ea;
@@ -787,6 +788,41 @@ textarea {
   display: grid;
   gap: 7px;
   padding: 8px;
+}
+
+.admin-credentials {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.admin-credentials .sub-panel-head {
+  padding-bottom: 6px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.admin-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.admin-form-footer span {
+  min-width: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-actions .sub-panel-head {
@@ -1603,6 +1639,10 @@ button:focus-visible,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .control-grid,
   .control-grid.setup-mode,
   .control-grid.node-mode,
@@ -1681,6 +1721,7 @@ button:focus-visible,
   .nav-list,
   .ops-strip,
   .settings-grid,
+  .admin-fields,
   .build-steps,
   .auto-steps,
   .auto-fields,
@@ -1702,6 +1743,15 @@ button:focus-visible,
 
   .form-actions {
     justify-content: stretch;
+  }
+
+  .admin-form-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-form-footer span {
+    white-space: normal;
   }
 
   .command-row {

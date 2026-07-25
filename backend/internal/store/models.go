@@ -97,6 +97,7 @@ type State struct {
 	Exits    []ExitNode   `json:"exits"`
 	Policies []Policy     `json:"policies"`
 	Tasks    []Task       `json:"tasks"`
+	Admin    *AdminConfig `json:"admin,omitempty"`
 }
 
 type Summary struct {
@@ -106,4 +107,12 @@ type Summary struct {
 	PolicyCount  int `json:"policyCount"`
 	TaskCount    int `json:"taskCount"`
 	HealthyExits int `json:"healthyExits"`
+}
+
+type AdminConfig struct {
+	Username       string    `json:"username"`
+	PasswordSalt   string    `json:"passwordSalt"`
+	PasswordHash   string    `json:"passwordHash"`
+	SessionVersion int64     `json:"sessionVersion"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }

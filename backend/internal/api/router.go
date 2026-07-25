@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"proxy-control/backend/internal/store"
@@ -25,19 +26,24 @@ type Options struct {
 }
 
 type Router struct {
-	store         *store.FileStore
-	httpAddr      string
-	corsOrigin    string
-	dataDir       string
-	frontendDir   string
-	agentToken    string
-	adminUsername string
-	adminPassword string
-	sessionSecret string
-	aiBaseURL     string
-	aiAPIKey      string
-	aiModel       string
-	httpClient    *http.Client
+	store               *store.FileStore
+	httpAddr            string
+	corsOrigin          string
+	dataDir             string
+	frontendDir         string
+	agentToken          string
+	authMu              sync.RWMutex
+	adminUsername       string
+	adminPassword       string
+	adminHash           string
+	adminSalt           string
+	authVersion         int64
+	sessionSecret       string
+	sessionSecretCustom bool
+	aiBaseURL           string
+	aiAPIKey            string
+	aiModel             string
+	httpClient          *http.Client
 }
 
 func NewRouter(st *store.FileStore, opts Options) http.Handler {
@@ -47,27 +53,44 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	if opts.AdminPassword == "" {
 		opts.AdminPassword = "admin"
 	}
+	sessionSecretCustom := opts.SessionSecret != ""
 	if opts.SessionSecret == "" {
 		opts.SessionSecret = "proxy-control-session:" + opts.AdminPassword
 	}
 	if opts.AIModel == "" {
 		opts.AIModel = "gpt-4o-mini"
 	}
+	adminUsername := opts.AdminUsername
+	adminPassword := opts.AdminPassword
+	var adminHash string
+	var adminSalt string
+	var authVersion int64
+	if adminConfig, ok := st.AdminConfig(); ok {
+		adminUsername = adminConfig.Username
+		adminPassword = ""
+		adminHash = adminConfig.PasswordHash
+		adminSalt = adminConfig.PasswordSalt
+		authVersion = adminConfig.SessionVersion
+	}
 
 	r := &Router{
-		store:         st,
-		httpAddr:      opts.HTTPAddr,
-		corsOrigin:    opts.CORSAllowOrigin,
-		dataDir:       opts.DataDir,
-		frontendDir:   opts.FrontendDir,
-		agentToken:    opts.AgentToken,
-		adminUsername: opts.AdminUsername,
-		adminPassword: opts.AdminPassword,
-		sessionSecret: opts.SessionSecret,
-		aiBaseURL:     strings.TrimSpace(opts.AIBaseURL),
-		aiAPIKey:      strings.TrimSpace(opts.AIAPIKey),
-		aiModel:       opts.AIModel,
-		httpClient:    &http.Client{Timeout: 20 * time.Second},
+		store:               st,
+		httpAddr:            opts.HTTPAddr,
+		corsOrigin:          opts.CORSAllowOrigin,
+		dataDir:             opts.DataDir,
+		frontendDir:         opts.FrontendDir,
+		agentToken:          opts.AgentToken,
+		adminUsername:       adminUsername,
+		adminPassword:       adminPassword,
+		adminHash:           adminHash,
+		adminSalt:           adminSalt,
+		authVersion:         authVersion,
+		sessionSecret:       opts.SessionSecret,
+		sessionSecretCustom: sessionSecretCustom,
+		aiBaseURL:           strings.TrimSpace(opts.AIBaseURL),
+		aiAPIKey:            strings.TrimSpace(opts.AIAPIKey),
+		aiModel:             opts.AIModel,
+		httpClient:          &http.Client{Timeout: 20 * time.Second},
 	}
 	mux := http.NewServeMux()
 
@@ -75,6 +98,7 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	mux.HandleFunc("/api/auth/login", r.handleLogin)
 	mux.HandleFunc("/api/auth/me", r.handleMe)
 	mux.HandleFunc("/api/settings", r.handleSettings)
+	mux.HandleFunc("/api/settings/admin", r.handleAdminSettings)
 	mux.HandleFunc("/api/ai/chat", r.handleAIChat)
 	mux.HandleFunc("/api/agent/heartbeat", r.handleAgentHeartbeat)
 	mux.HandleFunc("/api/agent/install", r.handleAgentInstall)

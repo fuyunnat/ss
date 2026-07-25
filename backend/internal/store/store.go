@@ -47,6 +47,25 @@ func (s *FileStore) Summary() Summary {
 	}
 }
 
+func (s *FileStore) AdminConfig() (AdminConfig, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.state.Admin == nil || s.state.Admin.Username == "" || s.state.Admin.PasswordHash == "" || s.state.Admin.PasswordSalt == "" {
+		return AdminConfig{}, false
+	}
+	return *s.state.Admin, true
+}
+
+func (s *FileStore) SaveAdminConfig(input AdminConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	input.UpdatedAt = time.Now().UTC()
+	s.state.Admin = &input
+	return s.saveLocked()
+}
+
 func (s *FileStore) ListServers() []ServerNode {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

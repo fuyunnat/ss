@@ -3,18 +3,23 @@ package api
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"proxy-control/backend/internal/store"
 )
 
 const sessionDuration = 24 * time.Hour
+const passwordHashIterations = 120000
 
 type contextKey string
 
@@ -33,6 +38,7 @@ type authResponse struct {
 type tokenPayload struct {
 	Username  string `json:"username"`
 	ExpiresAt int64  `json:"exp"`
+	Version   int64  `json:"version,omitempty"`
 }
 
 func (r *Router) handleLogin(w http.ResponseWriter, req *http.Request) {
@@ -45,17 +51,19 @@ func (r *Router) handleLogin(w http.ResponseWriter, req *http.Request) {
 	if !decodeJSON(w, req, &input) {
 		return
 	}
-	if !constantTimeEqual(input.Username, r.adminUsername) || !constantTimeEqual(input.Password, r.adminPassword) {
+
+	username, ok := r.validateAdminLogin(input.Username, input.Password)
+	if !ok {
 		writeError(w, http.StatusUnauthorized, "用户名或密码不正确")
 		return
 	}
 
-	token, err := r.issueToken(input.Username)
+	token, err := r.issueToken(username)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "创建登录会话失败")
 		return
 	}
-	writeJSON(w, http.StatusOK, authResponse{Token: token, Username: input.Username})
+	writeJSON(w, http.StatusOK, authResponse{Token: token, Username: username})
 }
 
 func (r *Router) handleMe(w http.ResponseWriter, req *http.Request) {
@@ -94,9 +102,14 @@ func isPublicAPI(path string) bool {
 }
 
 func (r *Router) issueToken(username string) (string, error) {
+	r.authMu.RLock()
+	version := r.authVersion
+	r.authMu.RUnlock()
+
 	payload := tokenPayload{
 		Username:  username,
 		ExpiresAt: time.Now().Add(sessionDuration).Unix(),
+		Version:   version,
 	}
 	rawPayload, err := json.Marshal(payload)
 	if err != nil {
@@ -140,6 +153,12 @@ func (r *Router) validateToken(token string) (string, error) {
 	if payload.Username == "" || payload.ExpiresAt < time.Now().Unix() {
 		return "", fmt.Errorf("token expired")
 	}
+	r.authMu.RLock()
+	version := r.authVersion
+	r.authMu.RUnlock()
+	if payload.Version != version {
+		return "", errors.New("token session expired")
+	}
 	return payload.Username, nil
 }
 
@@ -159,4 +178,70 @@ func constantTimeEqual(left string, right string) bool {
 func usernameFromContext(ctx context.Context) string {
 	username, _ := ctx.Value(usernameContextKey).(string)
 	return username
+}
+
+func (r *Router) validateAdminLogin(username string, password string) (string, bool) {
+	r.authMu.RLock()
+	adminUsername := r.adminUsername
+	adminPassword := r.adminPassword
+	adminHash := r.adminHash
+	adminSalt := r.adminSalt
+	r.authMu.RUnlock()
+
+	if !constantTimeEqual(username, adminUsername) {
+		return "", false
+	}
+	if adminHash != "" && adminSalt != "" {
+		return adminUsername, constantTimeEqual(hashPassword(password, adminSalt), adminHash)
+	}
+	return adminUsername, constantTimeEqual(password, adminPassword)
+}
+
+func (r *Router) updateAdminCredentials(username string, password string) (authResponse, error) {
+	salt, err := newPasswordSalt()
+	if err != nil {
+		return authResponse{}, err
+	}
+	sessionVersion := time.Now().UTC().UnixNano()
+	adminConfig := store.AdminConfig{
+		Username:       username,
+		PasswordSalt:   salt,
+		PasswordHash:   hashPassword(password, salt),
+		SessionVersion: sessionVersion,
+	}
+	if err := r.store.SaveAdminConfig(adminConfig); err != nil {
+		return authResponse{}, err
+	}
+
+	r.authMu.Lock()
+	r.adminUsername = username
+	r.adminPassword = ""
+	r.adminSalt = salt
+	r.adminHash = adminConfig.PasswordHash
+	r.authVersion = sessionVersion
+	r.authMu.Unlock()
+
+	token, err := r.issueToken(username)
+	if err != nil {
+		return authResponse{}, err
+	}
+	return authResponse{Token: token, Username: username}, nil
+}
+
+func newPasswordSalt() (string, error) {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf[:]), nil
+}
+
+func hashPassword(password string, salt string) string {
+	sum := sha256.Sum256([]byte(salt + ":" + password))
+	value := sum[:]
+	for i := 0; i < passwordHashIterations; i++ {
+		next := sha256.Sum256(append([]byte(salt+":"), value...))
+		value = next[:]
+	}
+	return hex.EncodeToString(value)
 }
