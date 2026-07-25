@@ -25,6 +25,7 @@ import { BeginnerFlow } from './components/BeginnerFlow';
 import { ProtocolBuilder } from './components/ProtocolBuilder';
 import { Field, StatusBadge } from './components/ui';
 import { messages, type Locale } from './i18n';
+import { policyMatchMeta, policyMatchOptions, policyMatchSummary, policyStrategyMeta, policyStrategyOptions } from './policyOptions';
 import { createProtocolForm, protocolPresets } from './protocolDefaults';
 import type { ExitNode, Gateway, Policy, ProtocolForm, ServerNode, Summary, Task } from './types';
 
@@ -78,6 +79,8 @@ function App() {
   const healthRate = summary.exitCount === 0 ? 0 : Math.round((summary.healthyExits / summary.exitCount) * 100);
   const selectedTaskType = taskTypeMeta(taskForm.type, copyText);
   const selectedTaskTarget = taskTargetLabel(taskForm.targetType, copyText);
+  const selectedPolicyMatch = policyMatchMeta(policyForm.matchType, copyText);
+  const selectedPolicyStrategy = policyStrategyMeta(policyForm.strategy, copyText);
   const selectedProtocolServer = servers.find((item) => item.id === protocolForm.serverId);
   const protocolDeploySummary = [
     `${protocolForm.core.toUpperCase()} ${protocolForm.protocol.toUpperCase()}`,
@@ -367,13 +370,31 @@ function App() {
 
             {active === 'policies' && (
               <form className="control-form" onSubmit={savePolicy}>
-                <Field label={t.common.name}><input value={policyForm.name} onChange={(e) => setPolicyForm({ ...policyForm, name: e.target.value })} required placeholder={t.forms.policyName} /></Field>
-                <div className="form-row">
-                  <Field label={t.common.match}><select value={policyForm.matchType} onChange={(e) => setPolicyForm({ ...policyForm, matchType: e.target.value })}><option>default</option><option>user</option><option>domain</option><option>cidr</option><option>region</option></select></Field>
-                  <Field label={t.common.strategy}><select value={policyForm.strategy} onChange={(e) => setPolicyForm({ ...policyForm, strategy: e.target.value })}><option>fixed</option><option>weighted</option><option>health_weighted</option><option>cost_first</option></select></Field>
+                <div className="task-guide">
+                  <strong>{selectedPolicyStrategy.label}</strong>
+                  <span>{selectedPolicyMatch.hint}</span>
+                  <small>{copyText('不确定就保持默认：全部流量 + 自动选择健康出口。', 'If unsure, keep the default: all traffic + healthy automatic routing.')}</small>
                 </div>
-                <Field label={t.forms.matchValue}><input value={policyForm.matchValue} onChange={(e) => setPolicyForm({ ...policyForm, matchValue: e.target.value })} placeholder={t.forms.matchValue} /></Field>
-                <Field label={t.forms.exitIds}><input value={policyExitIDsText} onChange={(e) => setPolicyExitIDsText(e.target.value)} placeholder={copyText('exit-a, exit-b', 'exit-a, exit-b')} /></Field>
+                <Field label={copyText('规则名称', 'Rule Name')}><input value={policyForm.name} onChange={(e) => setPolicyForm({ ...policyForm, name: e.target.value })} required placeholder={copyText('例如：默认出口规则', 'e.g. Default exit rule')} /></Field>
+                <div className="form-row">
+                  <Field label={copyText('适用流量', 'Traffic Scope')}>
+                    <select value={policyForm.matchType} onChange={(e) => setPolicyForm({ ...policyForm, matchType: e.target.value, matchValue: e.target.value === 'default' ? '*' : policyForm.matchValue === '*' ? '' : policyForm.matchValue })}>
+                      {policyMatchOptions(copyText).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </select>
+                  </Field>
+                  <Field label={copyText('出口选择', 'Exit Selection')}>
+                    <select value={policyForm.strategy} onChange={(e) => setPolicyForm({ ...policyForm, strategy: e.target.value })}>
+                      {policyStrategyOptions(copyText).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                {policyForm.matchType !== 'default' && (
+                  <Field label={selectedPolicyMatch.valueLabel}><input value={policyForm.matchValue === '*' ? '' : policyForm.matchValue} onChange={(e) => setPolicyForm({ ...policyForm, matchValue: e.target.value })} required placeholder={selectedPolicyMatch.placeholder} /></Field>
+                )}
+                <details className="advanced-box">
+                  <summary>{copyText('高级：指定出口节点', 'Advanced: pin exit nodes')}</summary>
+                  <Field label={copyText('出口 ID，可选', 'Exit IDs, optional')}><input value={policyExitIDsText} onChange={(e) => setPolicyExitIDsText(e.target.value)} placeholder={copyText('留空使用所有可用出口；多个出口用逗号分隔', 'Blank uses all enabled exits; comma-separated IDs')} /></Field>
+                </details>
                 <FormActions primary={policyForm.id ? t.actions.update : t.actions.add} reset={t.actions.reset} onReset={() => { setPolicyForm(emptyPolicy); setPolicyExitIDsText(''); }} />
               </form>
             )}
@@ -443,7 +464,7 @@ function App() {
             )}
             {active === 'policies' && (
               <DataTable headers={[t.common.name, t.common.match, t.common.strategy, t.common.operations]} empty={policies.length === 0 ? t.common.empty : ''}>
-                {policies.map((item) => <DataRow key={item.id} title={item.name} detail={`${item.matchType}: ${item.matchValue || '*'}`} status={`${item.strategy} / ${item.sticky ? 'sticky' : 'stateless'}`} actions={<>
+                {policies.map((item) => <DataRow key={item.id} title={item.name} detail={policyMatchSummary(item, copyText)} status={policyStrategyMeta(item.strategy, copyText).label} actions={<>
                   <IconButton label={t.actions.edit} onClick={() => { setPolicyForm(item); setPolicyExitIDsText(item.exitIds.join(', ')); }} icon={Pencil} />
                   <IconButton danger label={t.actions.delete} onClick={() => removeItem('policy', item.id)} icon={Trash2} />
                 </>} />)}
