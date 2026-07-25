@@ -1,0 +1,116 @@
+.beginner-flow {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.flow-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flow-title strong {
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.flow-title span {
+  max-width: 680px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.flow-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.flow-card {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 9px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.flow-card b {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
+.flow-card.done b {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.flow-card div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.flow-card strong,
+.flow-card span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-card strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.flow-card span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.beginner-flow code {
+  display: block;
+  max-width: 100%;
+  padding: 8px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #bfdbfe;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 1180px) {
+  .flow-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .flow-title {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .flow-cards {
+    grid-template-columns: 1fr;
+  }
+}

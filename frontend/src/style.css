@@ -276,7 +276,6 @@ p {
 }
 
 .health-tile,
-.traffic-board,
 .config-panel,
 .data-panel {
   border: 1px solid #dce3ea;
@@ -300,8 +299,6 @@ p {
 }
 
 .health-tile span,
-.traffic-step span,
-.traffic-step small,
 .panel-head span,
 .field span,
 .panel-toolbar span {
@@ -317,56 +314,6 @@ p {
 .health-tile small {
   color: #64748b;
   font-size: 12px;
-}
-
-.traffic-board {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 10px;
-  padding: 9px;
-}
-
-.traffic-step {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  gap: 2px 7px;
-  min-height: 60px;
-  padding: 9px;
-  border: 1px solid #e4eaf0;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.traffic-step svg {
-  grid-row: span 3;
-  margin-top: 2px;
-  color: #2563eb;
-}
-
-.traffic-step strong,
-.traffic-step small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.traffic-step strong {
-  color: #111827;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.traffic-step small {
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.flow-arrow {
-  justify-self: center;
-  color: #94a3b8;
 }
 
 .control-grid {
@@ -948,14 +895,6 @@ button:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .traffic-board {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .flow-arrow {
-    display: none;
-  }
-
   .control-grid {
     grid-template-columns: 1fr;
   }
@@ -1013,7 +952,6 @@ button:focus-visible {
 
   .nav-list,
   .ops-strip,
-  .traffic-board,
   .build-steps,
   .auto-steps,
   .auto-fields,

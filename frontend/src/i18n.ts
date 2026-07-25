@@ -4,8 +4,8 @@ export const messages = {
   'zh-CN': {
     app: {
       eyebrow: 'Proxy Orchestration Console',
-      title: '统一入口调度到多出口',
-      subtitle: '管理 Gateway、Agent、自建出口和第三方代理池',
+      title: '三步上线代理节点',
+      subtitle: '先让服务器上线，再选择协议创建可用节点',
       refresh: '刷新',
       language: '语言',
       loading: '正在同步控制面数据',
@@ -17,11 +17,11 @@ export const messages = {
       saveFailed: '操作失败',
     },
     nav: {
-      gateways: '代理入口',
-      exits: '出口池',
-      policies: '调度策略',
-      servers: '被控服务器',
-      tasks: '执行任务',
+      gateways: '入口配置',
+      exits: '创建节点',
+      policies: '分流规则',
+      servers: '服务器上线',
+      tasks: '操作记录',
     },
     route: {
       entry: '入口',
@@ -114,8 +114,8 @@ export const messages = {
   'en-US': {
     app: {
       eyebrow: 'Proxy Orchestration Console',
-      title: 'Route One Entry To Many Exits',
-      subtitle: 'Manage gateways, agents, owned exits, and external proxy pools',
+      title: 'Bring A Proxy Node Online In 3 Steps',
+      subtitle: 'Install an agent first, then create a usable protocol node',
       refresh: 'Refresh',
       language: 'Language',
       loading: 'Syncing control-plane data',
@@ -127,11 +127,11 @@ export const messages = {
       saveFailed: 'Action failed',
     },
     nav: {
-      gateways: 'Gateways',
-      exits: 'Exit Pool',
-      policies: 'Policies',
-      servers: 'Agents',
-      tasks: 'Tasks',
+      gateways: 'Entry',
+      exits: 'Create Node',
+      policies: 'Rules',
+      servers: 'Bring Online',
+      tasks: 'Logs',
     },
     route: {
       entry: 'Entry',

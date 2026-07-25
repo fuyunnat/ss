@@ -2,13 +2,9 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
-  ArrowRight,
-  Cable,
   CheckCircle2,
   Clipboard,
-  Cpu,
   Database,
-  Gauge,
   Globe2,
   Languages,
   Layers3,
@@ -20,31 +16,20 @@ import {
   RotateCw,
   Route,
   Server,
-  Settings2,
   ShieldCheck,
   Trash2,
   Wifi,
-  Zap,
 } from 'lucide-react';
 import { api } from './api';
+import { AgentAutoOnline } from './components/AgentAutoOnline';
+import { BeginnerFlow } from './components/BeginnerFlow';
+import { ProtocolBuilder, type ProtocolPreset } from './components/ProtocolBuilder';
+import { Field, StatusBadge } from './components/ui';
 import { messages, type Locale } from './i18n';
-import type { ExitNode, Gateway, Policy, ServerNode, Summary, Task } from './types';
+import type { ExitNode, Gateway, Policy, ProtocolForm, ServerNode, Summary, Task } from './types';
 
 type ActiveTab = 'gateways' | 'exits' | 'policies' | 'servers' | 'tasks';
 type ResourceKind = 'server' | 'gateway' | 'exit' | 'policy';
-type ProtocolForm = {
-  name: string;
-  serverId: string;
-  core: string;
-  protocol: string;
-  transport: string;
-  security: string;
-  port: number;
-  domain: string;
-  sni: string;
-  path: string;
-  credential: string;
-};
 
 const emptySummary: Summary = { serverCount: 0, gatewayCount: 0, exitCount: 0, policyCount: 0, taskCount: 0, healthyExits: 0 };
 const emptyGateway: Gateway = { name: '', serverId: '', listenHost: '0.0.0.0', socksPort: 1080, httpPort: 8081, status: 'planned' };
@@ -52,19 +37,19 @@ const emptyExit: ExitNode = { name: '', type: 'external_socks5', serverId: '', a
 const emptyPolicy: Policy = { name: '', matchType: 'default', matchValue: '*', strategy: 'health_weighted', exitIds: [], sticky: true, enabled: true };
 const emptyTask: Task = { type: 'sync_config', status: 'queued', targetType: 'gateway', targetId: '', summary: '', logs: [] };
 const emptyProtocolForm: ProtocolForm = { name: 'hk-vless-01', serverId: '', core: 'xray', protocol: 'vless', transport: 'tcp', security: 'reality', port: 443, domain: '', sni: 'www.cloudflare.com', path: '/', credential: '' };
-const protocolPresets = [
-  { protocol: 'vless', core: 'xray', security: 'reality', transport: 'tcp', port: 443 },
-  { protocol: 'vmess', core: 'xray', security: 'tls', transport: 'ws', port: 443 },
-  { protocol: 'trojan', core: 'xray', security: 'tls', transport: 'tcp', port: 443 },
-  { protocol: 'shadowsocks', core: 'sing-box', security: 'none', transport: 'tcp', port: 8388 },
-  { protocol: 'socks5', core: 'sing-box', security: 'none', transport: 'tcp', port: 1080 },
+const protocolPresets: ProtocolPreset[] = [
+  { protocol: 'vless', core: 'xray', security: 'reality', transport: 'tcp', port: 443, label: 'VLESS Reality', hint: '推荐' },
+  { protocol: 'vmess', core: 'xray', security: 'tls', transport: 'ws', port: 443, label: 'VMess WS TLS', hint: '兼容' },
+  { protocol: 'trojan', core: 'xray', security: 'tls', transport: 'tcp', port: 443, label: 'Trojan TLS', hint: '稳定' },
+  { protocol: 'shadowsocks', core: 'sing-box', security: 'none', transport: 'tcp', port: 8388, label: 'Shadowsocks', hint: '轻量' },
+  { protocol: 'socks5', core: 'sing-box', security: 'none', transport: 'tcp', port: 1080, label: 'SOCKS5', hint: '内网' },
 ];
 const taskTypes = ['sync_config', 'health_check', 'reload_core', 'switch_core_version'];
 const taskTargets = ['gateway', 'server', 'exit'];
 
 function App() {
   const [locale, setLocaleState] = useState<Locale>(() => readLocale());
-  const [active, setActive] = useState<ActiveTab>('gateways');
+  const [active, setActive] = useState<ActiveTab>('servers');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -87,18 +72,14 @@ function App() {
   const installCommand = 'curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh | sudo bash -s -- --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK';
 
   const navItems = useMemo(() => [
-    { id: 'gateways' as const, label: t.nav.gateways, count: summary.gatewayCount, icon: Network, hint: copyText('入口端口 / 协议', 'Entry ports') },
-    { id: 'exits' as const, label: t.nav.exits, count: summary.exitCount, icon: Activity, hint: copyText('自建 / 第三方', 'Owned / external') },
-    { id: 'policies' as const, label: t.nav.policies, count: summary.policyCount, icon: Route, hint: copyText('按规则分流', 'Traffic rules') },
-    { id: 'servers' as const, label: t.nav.servers, count: summary.serverCount, icon: Server, hint: copyText('Agent 节点', 'Agent nodes') },
-    { id: 'tasks' as const, label: t.nav.tasks, count: summary.taskCount, icon: Play, hint: copyText('下发和审计', 'Dispatch log') },
+    { id: 'servers' as const, label: t.nav.servers, count: summary.serverCount, icon: Server, hint: copyText('先执行安装脚本', 'Install first') },
+    { id: 'exits' as const, label: t.nav.exits, count: summary.exitCount, icon: Activity, hint: copyText('选择协议一键创建', 'One-click protocol') },
+    { id: 'gateways' as const, label: t.nav.gateways, count: summary.gatewayCount, icon: Network, hint: copyText('给客户端连接', 'Client entry') },
+    { id: 'policies' as const, label: t.nav.policies, count: summary.policyCount, icon: Route, hint: copyText('高级分流', 'Advanced routing') },
+    { id: 'tasks' as const, label: t.nav.tasks, count: summary.taskCount, icon: Play, hint: copyText('看执行结果', 'Execution result') },
   ], [copyText, summary, t]);
 
   const activeNav = navItems.find((item) => item.id === active) ?? navItems[0];
-  const primaryGateway = gateways[0];
-  const primaryPolicy = policies[0];
-  const primaryExit = exits.find((item) => item.health === 'healthy') ?? exits[0];
-  const latestTask = tasks[0];
   const onlineServers = servers.filter((item) => item.status === 'online').length;
   const enabledExits = exits.filter((item) => item.enabled).length;
   const taskSuccess = tasks.filter((item) => item.status === 'succeeded').length;
@@ -138,6 +119,12 @@ function App() {
   useEffect(() => {
     void refresh();
   }, []);
+
+  useEffect(() => {
+    if (!protocolForm.serverId && servers.length > 0) {
+      setProtocolForm((current) => current.serverId ? current : { ...current, serverId: servers[0].id ?? '' });
+    }
+  }, [protocolForm.serverId, servers]);
 
   function setLocale(next: Locale) {
     setLocaleState(next);
@@ -225,6 +212,9 @@ function App() {
   async function deployProtocolNode(event: FormEvent) {
     event.preventDefault();
     await withAction(async () => {
+      if (!protocolForm.serverId) {
+        throw new Error(copyText('先安装被控服务器，在线后再创建节点', 'Install an agent first, then create a node'));
+      }
       const nodeName = protocolForm.name.trim();
       const address = protocolForm.domain.trim() || selectedProtocolServer?.host || 'pending-agent';
       const savedExit = await api.saveExit({
@@ -312,6 +302,17 @@ function App() {
         {error && <div className="alert error-alert">{error}</div>}
         {notice && <div className="alert success-alert"><CheckCircle2 size={16} />{notice}</div>}
 
+        <BeginnerFlow
+          copyText={copyText}
+          installCommand={installCommand}
+          onlineServers={onlineServers}
+          exitCount={summary.exitCount}
+          onCopy={copyInstallCommand}
+          onOpenServers={() => setActive('servers')}
+          onOpenNodes={() => setActive('exits')}
+          onOpenTasks={() => setActive('tasks')}
+        />
+
         <section className="ops-strip">
           <HealthTile icon={Server} label={copyText('在线 Agent', 'Online Agents')} value={`${onlineServers}/${summary.serverCount}`} detail={copyText('被控端心跳', 'Agent heartbeat')} />
           <HealthTile icon={Globe2} label={copyText('可用出口', 'Enabled Exits')} value={`${enabledExits}/${summary.exitCount}`} detail={`${healthRate}% ${copyText('健康率', 'healthy')}`} />
@@ -319,19 +320,9 @@ function App() {
           <HealthTile icon={Database} label={copyText('任务完成', 'Tasks Done')} value={`${taskSuccess}/${summary.taskCount}`} detail={copyText('可审计操作流', 'Auditable actions')} />
         </section>
 
-        <section className="traffic-board">
-          <TrafficStep icon={Cable} label={t.route.entry} title={primaryGateway?.name ?? t.route.noGateway} meta={primaryGateway ? `${primaryGateway.listenHost}:${primaryGateway.socksPort}` : t.route.gatewayHint} />
-          <ArrowRight className="flow-arrow" size={18} />
-          <TrafficStep icon={Route} label={t.route.policy} title={primaryPolicy?.name ?? t.route.noPolicy} meta={primaryPolicy ? `${primaryPolicy.matchType} -> ${primaryPolicy.strategy}` : t.route.policyHint} />
-          <ArrowRight className="flow-arrow" size={18} />
-          <TrafficStep icon={Activity} label={t.route.exit} title={primaryExit?.name ?? t.route.noExit} meta={primaryExit ? `${primaryExit.type} / ${primaryExit.region || '-'}` : t.route.exitHint} />
-          <ArrowRight className="flow-arrow" size={18} />
-          <TrafficStep icon={ShieldCheck} label={t.route.task} title={latestTask ? taskStatusLabel(latestTask.status, copyText) : t.route.noTask} meta={latestTask?.summary ?? t.route.taskHint} />
-        </section>
-
         <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''}`}>
           <section className="config-panel">
-            <PanelHeader icon={activeNav.icon} title={activeNav.label} desc={copyText('配置、下发、检查都在这里完成', 'Configure, dispatch, and audit here')} />
+            <PanelHeader icon={activeNav.icon} title={activeNav.label} desc={panelDesc(active, copyText)} />
             {active === 'gateways' && (
               <form className="control-form" onSubmit={saveGateway}>
                 <Field label={t.common.name}><input value={gatewayForm.name} onChange={(e) => setGatewayForm({ ...gatewayForm, name: e.target.value })} required placeholder={t.forms.gatewayName} /></Field>
@@ -356,8 +347,10 @@ function App() {
                   summary={protocolDeploySummary}
                   onChange={setProtocolForm}
                   onSubmit={deployProtocolNode}
+                  onReset={() => setProtocolForm(emptyProtocolForm)}
                 />
-                <section className="sub-panel">
+                <details className="sub-panel advanced-side">
+                  <summary>{copyText('高级：接入第三方代理', 'Advanced: attach external proxy')}</summary>
                   <div className="sub-panel-head">
                     <strong>{copyText('接入第三方代理', 'Attach External Proxy')}</strong>
                     <span>{copyText('已有 SOCKS5 / HTTP 代理直接登记到出口池', 'Register existing SOCKS5 / HTTP proxies as exits')}</span>
@@ -375,7 +368,7 @@ function App() {
                     <Field label={t.forms.weight}><input value={exitForm.weight} onChange={(e) => setExitForm({ ...exitForm, weight: numberValue(e.target.value) })} type="number" min="1" /></Field>
                     <FormActions primary={exitForm.id ? t.actions.update : t.actions.add} reset={t.actions.reset} onReset={() => setExitForm(emptyExit)} />
                   </form>
-                </section>
+                </details>
               </div>
             )}
 
@@ -486,142 +479,12 @@ function App() {
   );
 }
 
-function ProtocolBuilder({
-  copyText,
-  form,
-  installCommand,
-  presets,
-  servers,
-  summary,
-  onChange,
-  onSubmit,
-}: {
-  copyText: (zh: string, en: string) => string;
-  form: ProtocolForm;
-  installCommand: string;
-  presets: typeof protocolPresets;
-  servers: ServerNode[];
-  summary: string;
-  onChange: (next: ProtocolForm) => void;
-  onSubmit: (event: FormEvent) => void;
-}) {
-  const update = (patch: Partial<ProtocolForm>) => onChange({ ...form, ...patch });
-
-  return (
-    <section className="protocol-builder">
-      <div className="builder-head">
-        <div>
-          <span>{copyText('自建协议节点', 'Self-hosted Protocol Node')}</span>
-          <strong>{copyText('选服务器、选协议、生成部署任务', 'Pick server, protocol, and dispatch a deploy task')}</strong>
-        </div>
-        <StatusBadge value={copyText('可下发', 'ready')} good />
-      </div>
-
-      <div className="build-steps">
-        <StepItem index="1" title={copyText('安装 Agent', 'Install Agent')} text={copyText('先在 VPS 执行被控端脚本', 'Run the agent installer on the VPS')} />
-        <StepItem index="2" title={copyText('选择协议', 'Choose Protocol')} text={copyText('VLESS / VMess / Trojan / SS / SOCKS5', 'VLESS / VMess / Trojan / SS / SOCKS5')} />
-        <StepItem index="3" title={copyText('下发核心', 'Deploy Core')} text={copyText('生成 Xray 或 sing-box 配置任务', 'Generate Xray or sing-box config task')} />
-        <StepItem index="4" title={copyText('接入策略', 'Route Traffic')} text={copyText('保存为出口后给策略引用', 'Saved exit can be referenced by policies')} />
-      </div>
-
-      <div className="preset-grid">
-        {presets.map((preset) => (
-          <button
-            key={`${preset.protocol}-${preset.core}-${preset.security}`}
-            className={form.protocol === preset.protocol && form.core === preset.core && form.security === preset.security ? 'preset active' : 'preset'}
-            type="button"
-            onClick={() => update({ ...preset })}
-          >
-            <strong>{preset.protocol.toUpperCase()}</strong>
-            <span>{preset.core} / {preset.security} / {preset.transport}</span>
-          </button>
-        ))}
-      </div>
-
-      <form className="control-form" onSubmit={onSubmit}>
-        <div className="form-row">
-          <Field label={copyText('节点名称', 'Node Name')}><input value={form.name} onChange={(e) => update({ name: e.target.value })} required placeholder="hk-vless-01" /></Field>
-          <Field label={copyText('被控服务器', 'Agent Server')}>
-            <select value={form.serverId} onChange={(e) => update({ serverId: e.target.value })}>
-              <option value="">{copyText('先选择 Agent，没有就先安装', 'Choose an agent, install one first if empty')}</option>
-              {servers.map((server) => <option key={server.id} value={server.id}>{server.name} / {server.host}</option>)}
-            </select>
-          </Field>
-        </div>
-        <div className="form-row">
-          <Field label={copyText('核心', 'Core')}><select value={form.core} onChange={(e) => update({ core: e.target.value })}><option>xray</option><option>sing-box</option></select></Field>
-          <Field label={copyText('端口', 'Port')}><input value={form.port} onChange={(e) => update({ port: numberValue(e.target.value) })} type="number" min="1" required /></Field>
-        </div>
-        <div className="form-row three">
-          <Field label={copyText('传输', 'Transport')}><select value={form.transport} onChange={(e) => update({ transport: e.target.value })}><option>tcp</option><option>ws</option><option>grpc</option><option>httpupgrade</option></select></Field>
-          <Field label={copyText('TLS / Reality', 'TLS / Reality')}><select value={form.security} onChange={(e) => update({ security: e.target.value })}><option>reality</option><option>tls</option><option>none</option></select></Field>
-          <Field label="SNI"><input value={form.sni} onChange={(e) => update({ sni: e.target.value })} placeholder="www.cloudflare.com" /></Field>
-        </div>
-        <div className="form-row three">
-          <Field label={copyText('域名或出口地址', 'Domain / Exit Address')}><input value={form.domain} onChange={(e) => update({ domain: e.target.value })} placeholder={copyText('留空则使用服务器 IP', 'Blank uses server IP')} /></Field>
-          <Field label={copyText('路径', 'Path')}><input value={form.path} onChange={(e) => update({ path: e.target.value })} placeholder="/proxy" /></Field>
-          <Field label={copyText('UUID / 密码', 'UUID / Password')}><input value={form.credential} onChange={(e) => update({ credential: e.target.value })} placeholder={copyText('留空由 Agent 生成', 'Blank lets agent generate')} /></Field>
-        </div>
-
-        <div className="deploy-preview">
-          <span>{copyText('将创建部署任务', 'Deploy task preview')}</span>
-          <strong>{summary}</strong>
-          <code>{installCommand}</code>
-        </div>
-
-        <div className="form-actions">
-          <button className="primary-button" type="submit"><Zap size={17} />{copyText('保存出口并下发部署任务', 'Save Exit And Queue Deploy')}</button>
-          <button className="secondary-button" type="button" onClick={() => onChange(emptyProtocolForm)}>{copyText('恢复默认', 'Reset')}</button>
-        </div>
-      </form>
-    </section>
-  );
-}
-
-function StepItem({ index, title, text }: { index: string; title: string; text: string }) {
-  return <article className="step-item"><b>{index}</b><strong>{title}</strong><span>{text}</span></article>;
-}
-
-function AgentAutoOnline({ copyText }: { copyText: (zh: string, en: string) => string }) {
-  return (
-    <section className="auto-online">
-      <div className="auto-head">
-        <strong>{copyText('安装后自动上线', 'Auto Online After Install')}</strong>
-        <span>{copyText('不需要在面板手动新增被控服务器', 'No manual agent creation is needed in the panel')}</span>
-      </div>
-      <div className="auto-steps">
-        <StepItem index="1" title={copyText('执行脚本', 'Run Installer')} text={copyText('脚本写入 systemd 并启动 Agent', 'Installer creates systemd service and starts agent')} />
-        <StepItem index="2" title={copyText('心跳注册', 'Heartbeat')} text={copyText('Agent 每 30 秒向总控上报一次', 'Agent reports to master every 30 seconds')} />
-        <StepItem index="3" title={copyText('自动入库', 'Auto Register')} text={copyText('总控按名称和地址更新节点记录', 'Master upserts node by name and host')} />
-      </div>
-      <div className="auto-fields">
-        <InfoItem label={copyText('安装时填写', 'Installer Inputs')} value={copyText('节点名称、地区、总控地址、Token', 'Node name, region, master URL, token')} />
-        <InfoItem label={copyText('自动获取', 'Auto Collected')} value={copyText('公网 IP、在线状态、Agent 版本、内存占用', 'Public IP, online status, agent version, memory usage')} />
-        <InfoItem label={copyText('版本规则', 'Version Rule')} value={copyText('Agent 版本写在程序里，每次更新递增并随心跳上报', 'Agent version is compiled, bumped every update, and reported by heartbeat')} />
-        <InfoItem label={copyText('标签', 'Tags')} value={copyText('系统内部自动标记，不再让你手动填写', 'Internal system tags are automatic and hidden from manual input')} />
-      </div>
-    </section>
-  );
-}
-
-function InfoItem({ label, value }: { label: string; value: string }) {
-  return <div className="info-item"><span>{label}</span><strong>{value}</strong></div>;
-}
-
 function HealthTile({ icon: Icon, label, value, detail }: { icon: LucideIcon; label: string; value: string | number; detail: string }) {
   return <article className="health-tile"><Icon size={18} /><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>;
 }
 
-function TrafficStep({ icon: Icon, label, title, meta }: { icon: LucideIcon; label: string; title: string; meta: string }) {
-  return <article className="traffic-step"><Icon size={18} /><span>{label}</span><strong>{title}</strong><small>{meta}</small></article>;
-}
-
 function PanelHeader({ icon: Icon, title, desc }: { icon: LucideIcon; title: string; desc: string }) {
   return <header className="panel-head"><Icon size={18} /><div><h3>{title}</h3><span>{desc}</span></div></header>;
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="field"><span>{label}</span>{children}</label>;
 }
 
 function FormActions({ primary, reset, onReset }: { primary: string; reset: string; onReset: () => void }) {
@@ -634,11 +497,6 @@ function DataTable({ headers, empty, children }: { headers: string[]; empty: str
 
 function DataRow({ title, detail, status, good = false, actions }: { title: string; detail: string; status: string; good?: boolean; actions: ReactNode }) {
   return <div className="data-row"><strong>{title}</strong><span>{detail}</span><StatusBadge value={status} good={good} /><div className="row-actions">{actions}</div></div>;
-}
-
-function StatusBadge({ value, good = false }: { value: string; good?: boolean }) {
-  const tone = good || value === 'online' || value === 'healthy' || value === 'succeeded' ? 'good' : value === 'failed' || value === 'offline' ? 'bad' : 'neutral';
-  return <em className={`status-badge ${tone}`}>{value}</em>;
 }
 
 function IconButton({ label, onClick, icon: Icon, danger = false, disabled = false }: { label: string; onClick: () => void; icon: LucideIcon; danger?: boolean; disabled?: boolean }) {
@@ -683,6 +541,17 @@ function taskTargetLabel(target: string, copyText: (zh: string, en: string) => s
     exit: copyText('出口节点', 'Exit Node'),
   };
   return map[target] ?? target;
+}
+
+function panelDesc(active: ActiveTab, copyText: (zh: string, en: string) => string) {
+  const map: Record<ActiveTab, string> = {
+    servers: copyText('复制命令到 VPS，脚本跑完自动出现在列表里', 'Copy installer to VPS; it appears automatically'),
+    exits: copyText('先用推荐协议创建一个节点，高级参数可以先不管', 'Create a node with recommended defaults first'),
+    gateways: copyText('高级入口配置，先不用动也可以', 'Advanced entry settings; optional at first'),
+    policies: copyText('高级分流配置，默认场景先不用配置', 'Advanced routing; optional for default use'),
+    tasks: copyText('部署、重载、健康检查的执行记录', 'Deploy, reload, and health-check records'),
+  };
+  return map[active];
 }
 
 function taskStatusLabel(status: string, copyText: (zh: string, en: string) => string) {

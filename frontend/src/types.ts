@@ -71,3 +71,17 @@ export interface Task {
   summary: string;
   logs: TaskLog[];
 }
+
+export interface ProtocolForm {
+  name: string;
+  serverId: string;
+  core: string;
+  protocol: string;
+  transport: string;
+  security: string;
+  port: number;
+  domain: string;
+  sni: string;
+  path: string;
+  credential: string;
+}

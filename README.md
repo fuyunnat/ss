@@ -11,6 +11,16 @@ This project is a new management system. It uses mature proxy cores such as Xray
 - task execution records
 - traffic and health model hooks
 
+## Beginner Flow
+
+The panel is organized around the shortest usable path:
+
+1. Open **Bring Online / 服务器上线** and copy the Linux agent install command to the VPS.
+2. Wait for the agent heartbeat. The server appears in the panel automatically.
+3. Open **Create Node / 创建节点**, choose the online server and a protocol preset, then create the deployment task.
+
+Gateway, routing policy, and task records remain available for advanced control, but a new user does not need to configure them before bringing the first node online.
+
 ## Development
 
 Backend:
