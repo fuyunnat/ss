@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"proxy-control/backend/internal/store"
@@ -17,9 +19,20 @@ type aiChatRequest struct {
 }
 
 type aiChatResponse struct {
-	Configured bool     `json:"configured"`
-	Reply      string   `json:"reply"`
-	Plan       []string `json:"plan"`
+	Configured bool       `json:"configured"`
+	Reply      string     `json:"reply"`
+	Plan       []string   `json:"plan"`
+	Actions    []aiAction `json:"actions"`
+}
+
+type aiAction struct {
+	ID                   string         `json:"id"`
+	Type                 string         `json:"type"`
+	Title                string         `json:"title"`
+	Description          string         `json:"description"`
+	Payload              map[string]any `json:"payload"`
+	MissingFields        []string       `json:"missingFields"`
+	RequiresConfirmation bool           `json:"requiresConfirmation"`
 }
 
 type openAIChatRequest struct {
@@ -58,12 +71,23 @@ func (r *Router) handleAIChat(w http.ResponseWriter, req *http.Request) {
 		writeError(w, http.StatusBadRequest, "问题太长，请控制在 4000 字以内")
 		return
 	}
+	actions := inferActionsFromMessage(message)
+	if len(actions) > 0 && (r.aiBaseURL == "" || r.aiAPIKey == "") {
+		writeJSON(w, http.StatusOK, aiChatResponse{
+			Configured: false,
+			Reply:      fmt.Sprintf("已从你的描述里识别出 %d 台待安装服务器。补齐总控地址、Agent Token 和 SSH 认证方式后，可以在右侧确认批量安装。", len(actions)),
+			Plan:       []string{"检查识别出来的服务器 IP、SSH 用户、端口和地区", "填写批量安装默认参数", "确认后由总控逐台创建安装任务", "安装完成后等待 Agent 心跳自动上线"},
+			Actions:    actions,
+		})
+		return
+	}
 
 	if r.aiBaseURL == "" || r.aiAPIKey == "" {
 		writeJSON(w, http.StatusOK, aiChatResponse{
 			Configured: false,
 			Reply:      "后台还没有配置 AI 接口和密钥。请在后端环境变量里配置 PROXY_CONTROL_AI_BASE_URL 和 PROXY_CONTROL_AI_API_KEY。",
-			Plan:       []string{"配置后端 AI 接口地址", "配置后端 AI API Key", "重启后端服务后再使用 AI 助手"},
+			Plan:       []string{"配置后端 AI 接口地址", "配置后端 AI API Key", "重启后端服务后再使用 AI 助手", "也可以直接粘贴服务器 IP 列表，系统会先生成批量安装草案"},
+			Actions:    []aiAction{},
 		})
 		return
 	}
@@ -77,6 +101,7 @@ func (r *Router) handleAIChat(w http.ResponseWriter, req *http.Request) {
 		Configured: true,
 		Reply:      reply,
 		Plan:       extractPlan(reply),
+		Actions:    actions,
 	})
 }
 
@@ -244,4 +269,153 @@ func extractPlan(reply string) []string {
 		return []string{"查看 AI 回复中的建议", "确认后再通过面板任务执行变更"}
 	}
 	return plan
+}
+
+func inferActionsFromMessage(message string) []aiAction {
+	hosts := parseInstallTargets(message)
+	actions := make([]aiAction, 0, len(hosts))
+	seen := make(map[string]bool, len(hosts))
+	for _, target := range hosts {
+		if target.SSHHost == "" || seen[target.SSHHost] {
+			continue
+		}
+		seen[target.SSHHost] = true
+		payload := map[string]any{
+			"sshHost":    target.SSHHost,
+			"sshPort":    target.SSHPort,
+			"sshUser":    target.SSHUser,
+			"authMethod": "agent",
+			"nodeName":   target.NodeName,
+			"region":     target.Region,
+			"masterUrl":  "",
+			"agentToken": "",
+			"nodeHost":   "",
+		}
+		actions = append(actions, aiAction{
+			ID:                   fmt.Sprintf("install-%d", len(actions)+1),
+			Type:                 "install_agent",
+			Title:                "安装被控 Agent: " + target.NodeName,
+			Description:          fmt.Sprintf("%s@%s:%d，地区 %s", target.SSHUser, target.SSHHost, target.SSHPort, aiDefaultString(target.Region, "未指定")),
+			Payload:              payload,
+			MissingFields:        []string{"masterUrl", "agentToken"},
+			RequiresConfirmation: true,
+		})
+	}
+	return actions
+}
+
+type installTarget struct {
+	SSHHost  string
+	SSHPort  int
+	SSHUser  string
+	NodeName string
+	Region   string
+}
+
+var hostTokenPattern = regexp.MustCompile(`^([A-Za-z0-9._-]+@)?([A-Za-z0-9.-]+\.[A-Za-z]{2,}|(?:\d{1,3}\.){3}\d{1,3})(?::(\d{1,5}))?$`)
+var regionTokenPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,5}$`)
+
+func parseInstallTargets(message string) []installTarget {
+	lines := strings.Split(strings.ReplaceAll(message, "\r\n", "\n"), "\n")
+	targets := make([]installTarget, 0)
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		tokens := strings.Fields(strings.NewReplacer(",", " ", "，", " ", "|", " ", "\t", " ").Replace(line))
+		for index, token := range tokens {
+			target, ok := parseHostToken(token)
+			if !ok {
+				continue
+			}
+			target.Region = nearbyRegion(tokens, index)
+			target.NodeName = nearbyName(tokens, index, target.SSHHost)
+			targets = append(targets, target)
+			break
+		}
+	}
+	if len(targets) == 0 {
+		for _, token := range strings.Fields(message) {
+			if target, ok := parseHostToken(strings.Trim(token, "，,;；。")); ok {
+				target.NodeName = safeNodeName(target.SSHHost)
+				targets = append(targets, target)
+			}
+		}
+	}
+	return targets
+}
+
+func parseHostToken(token string) (installTarget, bool) {
+	token = strings.TrimSpace(strings.Trim(token, "，,;；。()[]{}"))
+	match := hostTokenPattern.FindStringSubmatch(token)
+	if match == nil {
+		return installTarget{}, false
+	}
+	user := strings.TrimSuffix(match[1], "@")
+	if user == "" {
+		user = "root"
+	}
+	port := 22
+	if match[3] != "" {
+		parsed, err := strconv.Atoi(match[3])
+		if err != nil || parsed <= 0 || parsed > 65535 {
+			return installTarget{}, false
+		}
+		port = parsed
+	}
+	return installTarget{
+		SSHHost:  match[2],
+		SSHPort:  port,
+		SSHUser:  user,
+		NodeName: safeNodeName(match[2]),
+	}, true
+}
+
+func nearbyRegion(tokens []string, hostIndex int) string {
+	for _, offset := range []int{1, 2, -1, -2} {
+		index := hostIndex + offset
+		if index < 0 || index >= len(tokens) {
+			continue
+		}
+		value := strings.Trim(strings.TrimSpace(tokens[index]), "，,;；。()[]{}")
+		upper := strings.ToUpper(value)
+		if len(upper) >= 2 && len(upper) <= 8 && regionTokenPattern.MatchString(upper) {
+			return upper
+		}
+	}
+	return ""
+}
+
+func nearbyName(tokens []string, hostIndex int, host string) string {
+	for _, offset := range []int{-1, 1, 2} {
+		index := hostIndex + offset
+		if index < 0 || index >= len(tokens) {
+			continue
+		}
+		value := strings.Trim(strings.TrimSpace(tokens[index]), "，,;；。()[]{}")
+		upper := strings.ToUpper(value)
+		if value == "" || strings.Contains(value, "@") || hostTokenPattern.MatchString(value) || regionTokenPattern.MatchString(upper) {
+			continue
+		}
+		if len([]rune(value)) <= 32 {
+			return value
+		}
+	}
+	return safeNodeName(host)
+}
+
+func safeNodeName(host string) string {
+	name := strings.NewReplacer(".", "-", ":", "-").Replace(host)
+	if len(name) > 32 {
+		return name[:32]
+	}
+	return name
+}
+
+func aiDefaultString(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }

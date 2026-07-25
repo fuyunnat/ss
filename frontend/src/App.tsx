@@ -462,7 +462,7 @@ function App() {
             )}
 
             {active === 'ai' && (
-              <AIAssistant copyText={copyText} onError={setError} />
+              <AIAssistant copyText={copyText} onError={setError} onNotice={showNotice} onRefresh={refresh} />
             )}
           </section>
 

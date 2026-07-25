@@ -99,6 +99,17 @@ export interface AIChatResponse {
   configured: boolean;
   reply: string;
   plan: string[];
+  actions: AIAction[];
+}
+
+export interface AIAction {
+  id: string;
+  type: 'install_agent' | string;
+  title: string;
+  description: string;
+  payload: Partial<AgentInstallRequest> & Record<string, unknown>;
+  missingFields: string[];
+  requiresConfirmation: boolean;
 }
 
 export interface ProtocolForm {

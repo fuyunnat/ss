@@ -232,6 +232,42 @@ func TestAIChatWithoutBackendConfig(t *testing.T) {
 	}
 }
 
+func TestAIChatDraftsBatchAgentInstalls(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ai/chat", strings.NewReader(`{"message":"帮我安装这些服务器\nroot@203.0.113.10:22 HK hk-01\n198.51.100.8 JP jp-01"}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var body aiChatResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Actions) != 2 {
+		t.Fatalf("expected 2 install actions, got %#v", body.Actions)
+	}
+	if body.Actions[0].Type != "install_agent" || body.Actions[0].Payload["sshHost"] != "203.0.113.10" {
+		t.Fatalf("unexpected first action: %#v", body.Actions[0])
+	}
+	if body.Actions[0].Payload["region"] != "HK" || body.Actions[0].Payload["nodeName"] != "hk-01" {
+		t.Fatalf("unexpected first action labels: %#v", body.Actions[0])
+	}
+	if body.Actions[1].Payload["sshHost"] != "198.51.100.8" {
+		t.Fatalf("unexpected second action: %#v", body.Actions[1])
+	}
+	if body.Actions[1].Payload["region"] != "JP" || body.Actions[1].Payload["nodeName"] != "jp-01" {
+		t.Fatalf("unexpected second action labels: %#v", body.Actions[1])
+	}
+}
+
 func newTestRouter(t *testing.T, st *store.FileStore, agentToken string) (http.Handler, string) {
 	t.Helper()
 	router := NewRouter(st, Options{

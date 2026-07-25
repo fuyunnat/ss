@@ -72,6 +72,16 @@ export PROXY_CONTROL_AI_MODEL=gpt-4o-mini
 
 The AI assistant calls an OpenAI-compatible chat completions endpoint. If the AI base URL or key is not configured, the AI tab stays usable and shows a backend configuration reminder instead of failing the whole panel.
 
+The AI tab can also draft controlled batch operations. For example, paste:
+
+```text
+帮我把这些服务器安装成被控端
+1.2.3.4 HK hk-01
+root@5.6.7.8:22 JP jp-01
+```
+
+The panel drafts one `install_agent` action per server. Fill the shared master URL, agent token, SSH user/port, and authentication method, then confirm the batch. The AI does not execute shell commands directly; it only creates tasks through the existing authenticated panel API after confirmation.
+
 ## Agent Install
 
 The normal path is the panel one-click installer. It calls:
