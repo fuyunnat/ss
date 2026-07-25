@@ -7,7 +7,7 @@ yellow='\033[0;33m'
 plain='\033[0m'
 
 GITHUB_REPO="${PROXY_CONTROL_GITHUB_REPO:-fuyunnat/ss}"
-VERSION="${PROXY_CONTROL_VERSION:-latest}"
+RELEASE_VERSION="${PROXY_CONTROL_VERSION:-latest}"
 PACKAGE_URL="${PROXY_CONTROL_MASTER_PACKAGE_URL:-}"
 WORK_DIR=""
 release="unknown"
@@ -127,11 +127,11 @@ ensure_dependencies() {
 
 release_download_url() {
   local asset="$1"
-  if [ "$VERSION" = "latest" ]; then
+  if [ "$RELEASE_VERSION" = "latest" ]; then
     printf 'https://github.com/%s/releases/latest/download/%s' "$GITHUB_REPO" "$asset"
     return
   fi
-  printf 'https://github.com/%s/releases/download/%s/%s' "$GITHUB_REPO" "$VERSION" "$asset"
+  printf 'https://github.com/%s/releases/download/%s/%s' "$GITHUB_REPO" "$RELEASE_VERSION" "$asset"
 }
 
 download_package() {
