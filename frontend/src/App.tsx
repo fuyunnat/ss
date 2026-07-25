@@ -2,11 +2,13 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
+  Bot,
   CheckCircle2,
   Database,
   Globe2,
   Languages,
   Layers3,
+  LogOut,
   Network,
   Pencil,
   Play,
@@ -19,17 +21,19 @@ import {
   Trash2,
   Wifi,
 } from 'lucide-react';
-import { api } from './api';
+import { api, AuthError, clearAuthSession, getAuthSession } from './api';
 import { AgentAutoOnline } from './components/AgentAutoOnline';
+import { AIAssistant } from './components/AIAssistant';
 import { BeginnerFlow } from './components/BeginnerFlow';
+import { LoginPanel } from './components/LoginPanel';
 import { ProtocolBuilder } from './components/ProtocolBuilder';
 import { Field, StatusBadge } from './components/ui';
+import { numberValue, panelDesc, readLocale, shortID, splitList, taskStatusLabel, taskTargetLabel, taskTypeMeta, type ActiveTab } from './appHelpers';
 import { messages, type Locale } from './i18n';
 import { policyMatchMeta, policyMatchOptions, policyMatchSummary, policyStrategyMeta, policyStrategyOptions } from './policyOptions';
 import { createProtocolForm, protocolPresets } from './protocolDefaults';
-import type { ExitNode, Gateway, Policy, ProtocolForm, ServerNode, Summary, Task } from './types';
+import type { AuthSession, ExitNode, Gateway, Policy, ProtocolForm, ServerNode, Summary, Task } from './types';
 
-type ActiveTab = 'gateways' | 'exits' | 'policies' | 'servers' | 'tasks';
 type ResourceKind = 'server' | 'gateway' | 'exit' | 'policy';
 
 const emptySummary: Summary = { serverCount: 0, gatewayCount: 0, exitCount: 0, policyCount: 0, taskCount: 0, healthyExits: 0 };
@@ -41,6 +45,7 @@ const taskTypes = ['sync_config', 'health_check', 'reload_core', 'switch_core_ve
 const taskTargets = ['gateway', 'server', 'exit'];
 
 function App() {
+  const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
   const [locale, setLocaleState] = useState<Locale>(() => readLocale());
   const [active, setActive] = useState<ActiveTab>('servers');
   const [loading, setLoading] = useState(false);
@@ -70,6 +75,7 @@ function App() {
     { id: 'gateways' as const, label: t.nav.gateways, count: summary.gatewayCount, icon: Network, hint: copyText('入口监听', 'Listeners') },
     { id: 'policies' as const, label: t.nav.policies, count: summary.policyCount, icon: Route, hint: copyText('流量调度', 'Traffic routing') },
     { id: 'tasks' as const, label: t.nav.tasks, count: summary.taskCount, icon: Play, hint: copyText('任务审计', 'Task audit') },
+    { id: 'ai' as const, label: t.nav.ai, count: 0, icon: Bot, hint: copyText('智能排查', 'AI ops') },
   ], [copyText, summary, t]);
 
   const activeNav = navItems.find((item) => item.id === active) ?? navItems[0];
@@ -95,6 +101,7 @@ function App() {
   ].filter(Boolean).join(' / ');
 
   async function refresh() {
+    if (!session) return;
     setLoading(true);
     setError('');
     try {
@@ -108,7 +115,7 @@ function App() {
       setPolicies(nextPolicies ?? []);
       setTasks(nextTasks ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.app.saveFailed);
+      handleError(err);
     } finally {
       setLoading(false);
     }
@@ -116,7 +123,7 @@ function App() {
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (!protocolForm.serverId && servers.length > 0) {
@@ -134,13 +141,22 @@ function App() {
     window.setTimeout(() => setNotice((current) => (current === message ? '' : current)), 2200);
   }
 
+  function handleError(err: unknown) {
+    if (err instanceof AuthError) {
+      setSession(null);
+      setError(err.message);
+      return;
+    }
+    setError(err instanceof Error ? err.message : t.app.saveFailed);
+  }
+
   async function withAction(action: () => Promise<void>, successMessage: string) {
     setError('');
     try {
       await action();
       showNotice(successMessage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.app.saveFailed);
+      handleError(err);
     }
   }
 
@@ -245,6 +261,15 @@ function App() {
     showNotice(t.app.copied);
   }
 
+  function logout() {
+    clearAuthSession();
+    setSession(null);
+  }
+
+  if (!session) {
+    return <LoginPanel onLogin={setSession} />;
+  }
+
   return (
     <main className="app-shell">
       <aside className="side-rail">
@@ -278,6 +303,7 @@ function App() {
         </nav>
 
         <div className="rail-foot">
+          <button className="secondary-button full" type="button" onClick={logout}><LogOut size={15} />{copyText('退出登录', 'Logout')}</button>
           <span>{copyText('支持 Xray / sing-box / SOCKS5 / HTTP', 'Xray / sing-box / SOCKS5 / HTTP')}</span>
         </div>
       </aside>
@@ -317,7 +343,7 @@ function App() {
           <HealthTile icon={Database} label={copyText('任务完成', 'Tasks Done')} value={`${taskSuccess}/${summary.taskCount}`} detail={copyText('可审计操作流', 'Auditable actions')} />
         </section>
 
-        <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''} ${active === 'servers' ? 'setup-mode' : ''}`}>
+        <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''} ${active === 'servers' ? 'setup-mode' : ''} ${active === 'ai' ? 'ai-mode' : ''}`}>
           <section className="config-panel">
             <PanelHeader icon={activeNav.icon} title={activeNav.label} desc={panelDesc(active, copyText)} />
             {active === 'gateways' && (
@@ -434,9 +460,13 @@ function App() {
                 <FormActions primary={t.actions.add} reset={t.actions.reset} onReset={() => setTaskForm(emptyTask)} />
               </form>
             )}
+
+            {active === 'ai' && (
+              <AIAssistant copyText={copyText} onError={setError} />
+            )}
           </section>
 
-          <section className="data-panel">
+          {active !== 'ai' && <section className="data-panel">
             <div className="panel-toolbar">
               <div>
                 <span>{loading ? t.app.loading : activeNav.hint}</span>
@@ -483,7 +513,7 @@ function App() {
                 {tasks.map((item) => <DataRow key={item.id} title={item.summary} detail={`${taskTypeMeta(item.type, copyText).label} | ${taskTargetLabel(item.targetType, copyText)} | ${shortID(item.targetId)}`} status={taskStatusLabel(item.status, copyText)} good={item.status === 'succeeded'} actions={<IconButton label={t.actions.run} onClick={() => runTask(item.id)} icon={Play} />} />)}
               </DataTable>
             )}
-          </section>
+          </section>}
         </section>
       </section>
     </main>
@@ -512,84 +542,6 @@ function DataRow({ title, detail, status, good = false, actions }: { title: stri
 
 function IconButton({ label, onClick, icon: Icon, danger = false, disabled = false }: { label: string; onClick: () => void; icon: LucideIcon; danger?: boolean; disabled?: boolean }) {
   return <button className={`icon-button ${danger ? 'danger' : ''}`} type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick}><Icon size={15} /></button>;
-}
-
-function taskTypeMeta(type: string, copyText: (zh: string, en: string) => string) {
-  const map: Record<string, { label: string; desc: string; summary: string }> = {
-    sync_config: {
-      label: copyText('同步配置', 'Sync Config'),
-      desc: copyText('把总控里的入口、出口、策略配置下发到目标节点，让实际流量按最新规则走。', 'Push the latest gateway, exit, and policy config to the target node.'),
-      summary: copyText('同步目标节点的最新代理配置', 'Sync the latest proxy config to target node'),
-    },
-    health_check: {
-      label: copyText('健康检查', 'Health Check'),
-      desc: copyText('检测出口节点是否可连、延迟是否正常，用于策略调度和故障剔除。', 'Check exit reachability and latency for routing and failover.'),
-      summary: copyText('检查目标出口或服务器健康状态', 'Check target exit or server health'),
-    },
-    reload_core: {
-      label: copyText('重载核心', 'Reload Core'),
-      desc: copyText('让被控端重新加载 Xray 或 sing-box 配置，通常在协议节点变更后执行。', 'Reload Xray or sing-box config on the agent after node changes.'),
-      summary: copyText('重载目标服务器代理核心', 'Reload proxy core on target server'),
-    },
-    switch_core_version: {
-      label: copyText('切换核心版本', 'Switch Core Version'),
-      desc: copyText('切换被控端使用的 Xray 或 sing-box 版本，用于升级、回退或兼容测试。', 'Switch Xray or sing-box version for upgrade, rollback, or compatibility tests.'),
-      summary: copyText('切换目标服务器核心版本', 'Switch target server core version'),
-    },
-    deploy_protocol_node: {
-      label: copyText('部署协议节点', 'Deploy Protocol Node'),
-      desc: copyText('在被控服务器生成协议配置并启动服务。', 'Generate protocol config and start service on the agent server.'),
-      summary: copyText('部署自建协议节点', 'Deploy self-hosted protocol node'),
-    },
-  };
-  return map[type] ?? { label: type, desc: copyText('未知任务类型，保留原始值用于兼容。', 'Unknown task type, raw value kept for compatibility.'), summary: type };
-}
-
-function taskTargetLabel(target: string, copyText: (zh: string, en: string) => string) {
-  const map: Record<string, string> = {
-    gateway: copyText('代理入口', 'Gateway'),
-    server: copyText('被控服务器', 'Agent Server'),
-    exit: copyText('出口节点', 'Exit Node'),
-  };
-  return map[target] ?? target;
-}
-
-function panelDesc(active: ActiveTab, copyText: (zh: string, en: string) => string) {
-  const map: Record<ActiveTab, string> = {
-    servers: copyText('通过 SSH 安装 Agent，心跳成功后自动进入被控列表', 'Install the agent over SSH; heartbeat registers it automatically'),
-    exits: copyText('按协议模板生成入站配置并创建部署任务', 'Create protocol inbounds and queue deployment tasks'),
-    gateways: copyText('配置客户端连接入口和监听端口', 'Configure client-facing listeners and ports'),
-    policies: copyText('定义入口流量到出口池的调度规则', 'Define routing rules from entries to exits'),
-    tasks: copyText('安装、部署、重载、检查的执行记录', 'Install, deploy, reload, and health-check records'),
-  };
-  return map[active];
-}
-
-function taskStatusLabel(status: string, copyText: (zh: string, en: string) => string) {
-  const map: Record<string, string> = {
-    queued: copyText('排队中', 'Queued'),
-    running: copyText('执行中', 'Running'),
-    succeeded: copyText('成功', 'Succeeded'),
-    failed: copyText('失败', 'Failed'),
-  };
-  return map[status] ?? status;
-}
-
-function splitList(value: string) {
-  return value.split(',').map((item) => item.trim()).filter(Boolean);
-}
-
-function shortID(id?: string) {
-  return id ? id.slice(0, 8) : '-';
-}
-
-function numberValue(value: string) {
-  return Number.parseInt(value, 10) || 0;
-}
-
-function readLocale(): Locale {
-  const saved = localStorage.getItem('proxy-control-locale');
-  return saved === 'en-US' ? 'en-US' : 'zh-CN';
 }
 
 export default App;

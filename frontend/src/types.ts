@@ -86,6 +86,21 @@ export interface AgentInstallRequest {
   nodeHost: string;
 }
 
+export interface AuthSession {
+  token: string;
+  username: string;
+}
+
+export interface AIChatRequest {
+  message: string;
+}
+
+export interface AIChatResponse {
+  configured: boolean;
+  reply: string;
+  plan: string[];
+}
+
 export interface ProtocolForm {
   name: string;
   serverId: string;

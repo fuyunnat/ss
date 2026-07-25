@@ -11,6 +11,12 @@ type Config struct {
 	AgentToken      string
 	DataDir         string
 	StatePath       string
+	AdminUsername   string
+	AdminPassword   string
+	SessionSecret   string
+	AIBaseURL       string
+	AIAPIKey        string
+	AIModel         string
 }
 
 func Load() Config {
@@ -21,6 +27,12 @@ func Load() Config {
 		AgentToken:      os.Getenv("PROXY_CONTROL_AGENT_TOKEN"),
 		DataDir:         dataDir,
 		StatePath:       filepath.Join(dataDir, "state.json"),
+		AdminUsername:   getenv("PROXY_CONTROL_ADMIN_USERNAME", "admin"),
+		AdminPassword:   getenv("PROXY_CONTROL_ADMIN_PASSWORD", "admin"),
+		SessionSecret:   os.Getenv("PROXY_CONTROL_SESSION_SECRET"),
+		AIBaseURL:       os.Getenv("PROXY_CONTROL_AI_BASE_URL"),
+		AIAPIKey:        os.Getenv("PROXY_CONTROL_AI_API_KEY"),
+		AIModel:         getenv("PROXY_CONTROL_AI_MODEL", "gpt-4o-mini"),
 	}
 }
 

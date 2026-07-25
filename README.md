@@ -30,6 +30,8 @@ Backend:
 ```bash
 cd backend
 export PROXY_CONTROL_AGENT_TOKEN=change-me
+export PROXY_CONTROL_ADMIN_USERNAME=admin
+export PROXY_CONTROL_ADMIN_PASSWORD=admin
 go run .
 ```
 
@@ -42,6 +44,33 @@ npm run dev
 ```
 
 Default backend address: `http://localhost:8080`.
+
+## Login and AI Agent
+
+The panel is protected by an admin login. The default local account is:
+
+```text
+username: admin
+password: admin
+```
+
+For production, override it on the backend before starting the service:
+
+```bash
+export PROXY_CONTROL_ADMIN_USERNAME=your-admin
+export PROXY_CONTROL_ADMIN_PASSWORD='change-this-password'
+export PROXY_CONTROL_SESSION_SECRET='change-this-long-random-secret'
+```
+
+AI provider settings are backend-only configuration. The frontend never stores or bundles the API key.
+
+```bash
+export PROXY_CONTROL_AI_BASE_URL=https://api.openai.com
+export PROXY_CONTROL_AI_API_KEY='your-api-key'
+export PROXY_CONTROL_AI_MODEL=gpt-4o-mini
+```
+
+The AI assistant calls an OpenAI-compatible chat completions endpoint. If the AI base URL or key is not configured, the AI tab stays usable and shows a backend configuration reminder instead of failing the whole panel.
 
 ## Agent Install
 

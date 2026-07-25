@@ -16,9 +16,10 @@ func TestCreateServerAndSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	router := NewRouter(st, "http://localhost:5173", "")
+	router, token := newTestRouter(t, st, "")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/servers", strings.NewReader(`{"name":"sg-01","host":"198.51.100.8"}`))
+	authorize(req, token)
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
@@ -26,6 +27,7 @@ func TestCreateServerAndSummary(t *testing.T) {
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/api/summary", nil)
+	authorize(req, token)
 	res = httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `"serverCount":1`) {
@@ -38,10 +40,11 @@ func TestCreateExitRequiresAddress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	router := NewRouter(st, "http://localhost:5173", "")
+	router, token := newTestRouter(t, st, "")
 
 	body := bytes.NewBufferString(`{"name":"bad-exit","type":"external_socks5","port":1080}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/exits", body)
+	authorize(req, token)
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 	if res.Code != http.StatusBadRequest {
@@ -54,9 +57,10 @@ func TestEmptyListsReturnArrays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	router := NewRouter(st, "http://localhost:5173", "")
+	router, token := newTestRouter(t, st, "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/gateways", nil)
+	authorize(req, token)
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
@@ -76,7 +80,7 @@ func TestAgentHeartbeatRequiresTokenWhenConfigured(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	router := NewRouter(st, "http://localhost:5173", "secret-token")
+	router, _ := newTestRouter(t, st, "secret-token")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/agent/heartbeat", strings.NewReader(`{"name":"hk-01","host":"203.0.113.1"}`))
 	res := httptest.NewRecorder()
@@ -99,9 +103,10 @@ func TestAgentInstallValidatesRequiredFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	router := NewRouter(st, "http://localhost:5173", "secret-token")
+	router, token := newTestRouter(t, st, "secret-token")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/agent/install", strings.NewReader(`{"sshHost":"","sshUser":"root"}`))
+	authorize(req, token)
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 	if res.Code != http.StatusBadRequest {
@@ -114,7 +119,7 @@ func TestAgentInstallRejectsMismatchedToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
-	router := NewRouter(st, "http://localhost:5173", "secret-token")
+	router, token := newTestRouter(t, st, "secret-token")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/agent/install", strings.NewReader(`{
 		"sshHost":"203.0.113.10",
@@ -123,6 +128,7 @@ func TestAgentInstallRejectsMismatchedToken(t *testing.T) {
 		"agentToken":"wrong-token",
 		"nodeName":"hk-01"
 	}`))
+	authorize(req, token)
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 	if res.Code != http.StatusBadRequest {
@@ -169,4 +175,79 @@ func TestBuildSSHCommandDoesNotPutAgentTokenInArgs(t *testing.T) {
 	if strings.Contains(strings.Join(args, " "), "agent-token") {
 		t.Fatalf("agent token leaked into command args: %#v", args)
 	}
+}
+
+func TestLoginAndProtectedRoutes(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, _ := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/summary", nil)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected protected route status 401, got %d", res.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"admin","password":"admin"}`))
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected login status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var body authResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	if body.Token == "" || body.Username != "admin" {
+		t.Fatalf("unexpected login response: %#v", body)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"admin","password":"wrong"}`))
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected wrong password status 401, got %d", res.Code)
+	}
+}
+
+func TestAIChatWithoutBackendConfig(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ai/chat", strings.NewReader(`{"message":"帮我检查节点"}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), `"configured":false`) {
+		t.Fatalf("expected configured false response, got %s", res.Body.String())
+	}
+}
+
+func newTestRouter(t *testing.T, st *store.FileStore, agentToken string) (http.Handler, string) {
+	t.Helper()
+	router := NewRouter(st, Options{
+		CORSAllowOrigin: "http://localhost:5173",
+		AgentToken:      agentToken,
+		AdminUsername:   "admin",
+		AdminPassword:   "admin",
+		SessionSecret:   "test-session-secret",
+	})
+	token, err := (&Router{sessionSecret: "test-session-secret"}).issueToken("admin")
+	if err != nil {
+		t.Fatalf("issue token: %v", err)
+	}
+	return router, token
+}
+
+func authorize(req *http.Request, token string) {
+	req.Header.Set("Authorization", "Bearer "+token)
 }

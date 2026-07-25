@@ -22,6 +22,7 @@ export const messages = {
       policies: '分流规则',
       servers: '服务器上线',
       tasks: '操作记录',
+      ai: 'AI 助手',
     },
     route: {
       entry: '入口',
@@ -132,6 +133,7 @@ export const messages = {
       policies: 'Rules',
       servers: 'Bring Online',
       tasks: 'Logs',
+      ai: 'AI Assistant',
     },
     route: {
       entry: 'Entry',

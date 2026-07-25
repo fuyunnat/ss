@@ -23,8 +23,17 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:    cfg.HTTPAddr,
-		Handler: api.NewRouter(st, cfg.CORSAllowOrigin, cfg.AgentToken),
+		Addr: cfg.HTTPAddr,
+		Handler: api.NewRouter(st, api.Options{
+			CORSAllowOrigin: cfg.CORSAllowOrigin,
+			AgentToken:      cfg.AgentToken,
+			AdminUsername:   cfg.AdminUsername,
+			AdminPassword:   cfg.AdminPassword,
+			SessionSecret:   cfg.SessionSecret,
+			AIBaseURL:       cfg.AIBaseURL,
+			AIAPIKey:        cfg.AIAPIKey,
+			AIModel:         cfg.AIModel,
+		}),
 	}
 
 	log.Printf("proxy control backend listening on %s", cfg.HTTPAddr)

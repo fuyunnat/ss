@@ -5,20 +5,65 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"proxy-control/backend/internal/store"
 )
 
-type Router struct {
-	store      *store.FileStore
-	agentToken string
+type Options struct {
+	CORSAllowOrigin string
+	AgentToken      string
+	AdminUsername   string
+	AdminPassword   string
+	SessionSecret   string
+	AIBaseURL       string
+	AIAPIKey        string
+	AIModel         string
 }
 
-func NewRouter(st *store.FileStore, corsAllowOrigin string, agentToken string) http.Handler {
-	r := &Router{store: st, agentToken: agentToken}
+type Router struct {
+	store         *store.FileStore
+	agentToken    string
+	adminUsername string
+	adminPassword string
+	sessionSecret string
+	aiBaseURL     string
+	aiAPIKey      string
+	aiModel       string
+	httpClient    *http.Client
+}
+
+func NewRouter(st *store.FileStore, opts Options) http.Handler {
+	if opts.AdminUsername == "" {
+		opts.AdminUsername = "admin"
+	}
+	if opts.AdminPassword == "" {
+		opts.AdminPassword = "admin"
+	}
+	if opts.SessionSecret == "" {
+		opts.SessionSecret = "proxy-control-session:" + opts.AdminPassword
+	}
+	if opts.AIModel == "" {
+		opts.AIModel = "gpt-4o-mini"
+	}
+
+	r := &Router{
+		store:         st,
+		agentToken:    opts.AgentToken,
+		adminUsername: opts.AdminUsername,
+		adminPassword: opts.AdminPassword,
+		sessionSecret: opts.SessionSecret,
+		aiBaseURL:     strings.TrimSpace(opts.AIBaseURL),
+		aiAPIKey:      strings.TrimSpace(opts.AIAPIKey),
+		aiModel:       opts.AIModel,
+		httpClient:    &http.Client{Timeout: 20 * time.Second},
+	}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/health", r.handleHealth)
+	mux.HandleFunc("/api/auth/login", r.handleLogin)
+	mux.HandleFunc("/api/auth/me", r.handleMe)
+	mux.HandleFunc("/api/ai/chat", r.handleAIChat)
 	mux.HandleFunc("/api/agent/heartbeat", r.handleAgentHeartbeat)
 	mux.HandleFunc("/api/agent/install", r.handleAgentInstall)
 	mux.HandleFunc("/api/summary", r.handleSummary)
@@ -33,7 +78,7 @@ func NewRouter(st *store.FileStore, corsAllowOrigin string, agentToken string) h
 	mux.HandleFunc("/api/tasks", r.handleTasks)
 	mux.HandleFunc("/api/tasks/", r.handleTaskByID)
 
-	return withCORS(mux, corsAllowOrigin)
+	return withCORS(r.withAuth(mux), opts.CORSAllowOrigin)
 }
 
 func (r *Router) handleHealth(w http.ResponseWriter, req *http.Request) {
