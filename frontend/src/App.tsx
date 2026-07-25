@@ -23,9 +23,10 @@ import {
 import { api } from './api';
 import { AgentAutoOnline } from './components/AgentAutoOnline';
 import { BeginnerFlow } from './components/BeginnerFlow';
-import { ProtocolBuilder, type ProtocolPreset } from './components/ProtocolBuilder';
+import { ProtocolBuilder } from './components/ProtocolBuilder';
 import { Field, StatusBadge } from './components/ui';
 import { messages, type Locale } from './i18n';
+import { createProtocolForm, protocolPresets } from './protocolDefaults';
 import type { ExitNode, Gateway, Policy, ProtocolForm, ServerNode, Summary, Task } from './types';
 
 type ActiveTab = 'gateways' | 'exits' | 'policies' | 'servers' | 'tasks';
@@ -36,14 +37,6 @@ const emptyGateway: Gateway = { name: '', serverId: '', listenHost: '0.0.0.0', s
 const emptyExit: ExitNode = { name: '', type: 'external_socks5', serverId: '', address: '', port: 1080, username: '', region: '', weight: 100, enabled: true, health: 'unknown', latencyMs: 0, failureRate: 0 };
 const emptyPolicy: Policy = { name: '', matchType: 'default', matchValue: '*', strategy: 'health_weighted', exitIds: [], sticky: true, enabled: true };
 const emptyTask: Task = { type: 'sync_config', status: 'queued', targetType: 'gateway', targetId: '', summary: '', logs: [] };
-const emptyProtocolForm: ProtocolForm = { name: 'hk-vless-01', serverId: '', core: 'xray', protocol: 'vless', transport: 'tcp', security: 'reality', port: 443, domain: '', sni: 'www.cloudflare.com', path: '/', credential: '' };
-const protocolPresets: ProtocolPreset[] = [
-  { protocol: 'vless', core: 'xray', security: 'reality', transport: 'tcp', port: 443, label: 'VLESS Reality', hint: '推荐' },
-  { protocol: 'vmess', core: 'xray', security: 'tls', transport: 'ws', port: 443, label: 'VMess WS TLS', hint: '兼容' },
-  { protocol: 'trojan', core: 'xray', security: 'tls', transport: 'tcp', port: 443, label: 'Trojan TLS', hint: '稳定' },
-  { protocol: 'shadowsocks', core: 'sing-box', security: 'none', transport: 'tcp', port: 8388, label: 'Shadowsocks', hint: '轻量' },
-  { protocol: 'socks5', core: 'sing-box', security: 'none', transport: 'tcp', port: 1080, label: 'SOCKS5', hint: '内网' },
-];
 const taskTypes = ['sync_config', 'health_check', 'reload_core', 'switch_core_version'];
 const taskTargets = ['gateway', 'server', 'exit'];
 
@@ -63,7 +56,7 @@ function App() {
   const [exitForm, setExitForm] = useState<ExitNode>(emptyExit);
   const [policyForm, setPolicyForm] = useState<Policy>(emptyPolicy);
   const [taskForm, setTaskForm] = useState<Task>(emptyTask);
-  const [protocolForm, setProtocolForm] = useState<ProtocolForm>(emptyProtocolForm);
+  const [protocolForm, setProtocolForm] = useState<ProtocolForm>(() => createProtocolForm());
   const [policyExitIDsText, setPolicyExitIDsText] = useState('');
 
   const t = messages[locale];
@@ -90,10 +83,13 @@ function App() {
   const protocolDeploySummary = [
     `${protocolForm.core.toUpperCase()} ${protocolForm.protocol.toUpperCase()}`,
     `${copyText('监听端口', 'listen')} ${protocolForm.port}`,
-    `${copyText('传输', 'transport')} ${protocolForm.transport}`,
-    `${copyText('安全', 'security')} ${protocolForm.security}`,
-    protocolForm.sni ? `SNI ${protocolForm.sni}` : '',
-    protocolForm.path && protocolForm.transport !== 'tcp' ? `path ${protocolForm.path}` : '',
+    protocolForm.listenIp ? `${copyText('监听', 'listen IP')} ${protocolForm.listenIp}` : '',
+    protocolForm.protocol === 'dokodemo-door' ? `${copyText('目标', 'target')} ${protocolForm.targetAddress || '-'}:${protocolForm.targetPort || '-'}` : `${copyText('传输', 'transport')} ${protocolForm.transport}`,
+    protocolForm.protocol === 'dokodemo-door' ? `${copyText('网络', 'network')} ${protocolForm.network}` : `${copyText('安全', 'security')} ${protocolForm.security}`,
+    protocolForm.protocol !== 'dokodemo-door' && protocolForm.sni ? `SNI ${protocolForm.sni}` : '',
+    protocolForm.protocol !== 'dokodemo-door' && protocolForm.path && protocolForm.transport !== 'tcp' ? `path ${protocolForm.path}` : '',
+    protocolForm.totalGb > 0 ? `${copyText('流量', 'traffic')} ${protocolForm.totalGb}GB` : '',
+    protocolForm.expiryDate ? `${copyText('到期', 'expiry')} ${protocolForm.expiryDate}` : '',
   ].filter(Boolean).join(' / ');
 
   async function refresh() {
@@ -226,6 +222,7 @@ function App() {
         port: protocolForm.port,
         username: protocolForm.credential,
         region: selectedProtocolServer?.region ?? '',
+        enabled: protocolForm.enabled,
         health: 'unknown',
       });
       await api.createTask({
@@ -347,7 +344,7 @@ function App() {
                   summary={protocolDeploySummary}
                   onChange={setProtocolForm}
                   onSubmit={deployProtocolNode}
-                  onReset={() => setProtocolForm(emptyProtocolForm)}
+                  onReset={() => setProtocolForm(createProtocolForm())}
                 />
                 <details className="sub-panel advanced-side">
                   <summary>{copyText('高级：接入第三方代理', 'Advanced: attach external proxy')}</summary>

@@ -77,11 +77,23 @@ export interface ProtocolForm {
   serverId: string;
   core: string;
   protocol: string;
+  listenIp: string;
   transport: string;
   security: string;
   port: number;
+  enabled: boolean;
+  totalGb: number;
+  expiryDate: string;
   domain: string;
   sni: string;
   path: string;
   credential: string;
+  extraId: number;
+  disableInsecureEncryption: boolean;
+  httpObfuscation: boolean;
+  tls: boolean;
+  sniffing: boolean;
+  targetAddress: string;
+  targetPort: number;
+  network: string;
 }

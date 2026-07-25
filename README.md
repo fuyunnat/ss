@@ -17,9 +17,11 @@ The panel is organized around the shortest usable path:
 
 1. Open **Bring Online / 服务器上线** and copy the Linux agent install command to the VPS.
 2. Wait for the agent heartbeat. The server appears in the panel automatically.
-3. Open **Create Node / 创建节点**, choose the online server and a protocol preset, then create the deployment task.
+3. Open **Create Node / 创建节点**, choose the online server and an inbound protocol, then create the deployment task.
 
 Gateway, routing policy, and task records remain available for advanced control, but a new user does not need to configure them before bringing the first node online.
+
+The inbound form follows the common x-ui flow: remark, enabled switch, protocol, listen IP, port, traffic limit, expiry date, ID, transport, TLS and sniffing. Supported presets include `vless`, `vmess`, `trojan`, `shadowsocks`, `socks5`, and `dokodemo-door`. When `dokodemo-door` is selected, target address, target port, and network fields are shown instead of UUID/TLS fields.
 
 ## Development
 
