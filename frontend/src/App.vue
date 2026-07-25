@@ -109,6 +109,8 @@ function splitList(value: string) {
 function shortID(id?: string) {
   return id ? id.slice(0, 8) : '-';
 }
+
+onMounted(refresh);
 </script>
 
 <template>
