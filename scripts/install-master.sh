@@ -491,7 +491,8 @@ EOF
 
 start_service() {
   systemctl daemon-reload
-  systemctl enable --now proxy-control
+  systemctl enable proxy-control
+  systemctl restart proxy-control
 }
 
 print_result() {

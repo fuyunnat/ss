@@ -440,7 +440,8 @@ copy_source_for_update() {
 
 start_service() {
   systemctl daemon-reload
-  systemctl enable --now proxy-control-agent
+  systemctl enable proxy-control-agent
+  systemctl restart proxy-control-agent
 }
 
 print_result() {
