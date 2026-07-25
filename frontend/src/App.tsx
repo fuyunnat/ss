@@ -52,7 +52,7 @@ const supportedExitProtocols = new Set(['vless', 'vmess', 'trojan', 'shadowsocks
 function App() {
   const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
   const [locale, setLocaleState] = useState<Locale>(() => readLocale());
-  const [active, setActive] = useState<ActiveTab>('servers');
+  const [active, setActive] = useState<ActiveTab>('gateways');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -75,12 +75,12 @@ function App() {
   const installCommand = 'curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh | sudo bash -s -- --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK';
 
   const navItems = useMemo(() => [
-    { id: 'servers' as const, label: t.nav.servers, count: summary.serverCount, icon: Server, hint: copyText('Agent 接入', 'Agent enroll') },
-    { id: 'exits' as const, label: t.nav.exits, count: summary.exitCount, icon: Activity, hint: copyText('协议节点', 'Protocol nodes') },
-    { id: 'gateways' as const, label: t.nav.gateways, count: summary.gatewayCount, icon: Network, hint: copyText('入口监听', 'Listeners') },
-    { id: 'policies' as const, label: t.nav.policies, count: summary.policyCount, icon: Route, hint: copyText('流量调度', 'Traffic routing') },
-    { id: 'tasks' as const, label: t.nav.tasks, count: summary.taskCount, icon: Play, hint: copyText('任务审计', 'Task audit') },
-    { id: 'ai' as const, label: t.nav.ai, count: 0, icon: Bot, hint: copyText('智能排查', 'AI ops') },
+    { id: 'gateways' as const, label: t.nav.gateways, count: summary.gatewayCount, icon: Network, hint: copyText('入口监听', 'Entry listeners') },
+    { id: 'exits' as const, label: t.nav.exits, count: summary.exitCount, icon: Activity, hint: copyText('协议出口', 'Protocol exits') },
+    { id: 'policies' as const, label: t.nav.policies, count: summary.policyCount, icon: Route, hint: copyText('调度规则', 'Routing rules') },
+    { id: 'servers' as const, label: t.nav.servers, count: summary.serverCount, icon: Server, hint: copyText('Agent 纳管', 'Agent fleet') },
+    { id: 'tasks' as const, label: t.nav.tasks, count: summary.taskCount, icon: Play, hint: copyText('执行记录', 'Execution logs') },
+    { id: 'ai' as const, label: t.nav.ai, count: 0, icon: Bot, hint: copyText('批量运维', 'Batch ops') },
   ], [copyText, summary, t]);
 
   const activeNav = navItems.find((item) => item.id === active) ?? navItems[0];
@@ -352,12 +352,12 @@ function App() {
           <div className="brand-mark"><Network size={22} /></div>
           <div>
             <h1>Proxy Control</h1>
-            <p>{copyText('总控调度台', 'Control Plane')}</p>
+            <p>{copyText('代理编排控制台', 'Proxy Control Plane')}</p>
           </div>
         </div>
 
         <div className="side-status">
-          <span>{copyText('控制面', 'Control')}</span>
+          <span>{copyText('控制节点', 'Control Node')}</span>
           <strong>{loading ? copyText('同步中', 'Syncing') : copyText('在线', 'Online')}</strong>
         </div>
 

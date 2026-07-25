@@ -44,12 +44,12 @@ export function taskTargetLabel(target: string, copyText: (zh: string, en: strin
 
 export function panelDesc(active: ActiveTab, copyText: (zh: string, en: string) => string) {
   const map: Record<ActiveTab, string> = {
-    servers: copyText('通过 SSH 安装 Agent，心跳成功后自动进入被控列表', 'Install the agent over SSH; heartbeat registers it automatically'),
-    exits: copyText('按协议模板生成入站配置并创建部署任务', 'Create protocol inbounds and queue deployment tasks'),
-    gateways: copyText('配置客户端连接入口和监听端口', 'Configure client-facing listeners and ports'),
-    policies: copyText('定义入口流量到出口池的调度规则', 'Define routing rules from entries to exits'),
-    tasks: copyText('安装、部署、重载、检查的执行记录', 'Install, deploy, reload, and health-check records'),
-    ai: copyText('读取总控状态，生成排查和操作建议', 'Read control-plane state and suggest operations'),
+    gateways: copyText('配置主控对外监听协议和端口', 'Configure master-facing listener protocols and ports'),
+    exits: copyText('管理自建协议节点和第三方代理出口', 'Manage self-hosted protocol nodes and external proxy exits'),
+    policies: copyText('定义入口流量命中后的出口调度规则', 'Define exit routing rules after entry traffic matches'),
+    servers: copyText('纳管被控服务器，安装 Agent 并上报心跳', 'Enroll controlled servers, install agents, and report heartbeat'),
+    tasks: copyText('审计安装、部署、同步、检查等执行记录', 'Audit install, deploy, sync, and health-check records'),
+    ai: copyText('根据服务器清单生成批量安装和运维草案', 'Draft batch installs and ops from server lists'),
   };
   return map[active];
 }
