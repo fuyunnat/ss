@@ -39,7 +39,8 @@ Proxy Control Agent 安装器
   fyss log          查看实时日志
   fyss config       修改总控地址、Token、节点名称等配置
   fyss open-port    手动开放节点端口
-  fyss update       拉取 GitHub 安装脚本并更新 Agent
+  fyss update       更新 Agent 到最新版
+  fyss update v0.1.7 更新 Agent 到指定版本
   fyss uninstall    卸载 Agent
 EOF
 }
@@ -226,11 +227,12 @@ show_menu() {
   echo "  5. 查看实时日志"
   echo "  6. 修改配置"
   echo "  7. 开放节点端口"
-  echo "  8. 更新 Agent"
-  echo "  9. 卸载 Agent"
+  echo "  8. 更新 fyss 到最新版"
+  echo "  9. 指定版本更新"
+  echo " 10. 卸载 Agent"
   echo "  0. 退出"
   echo "----------------------------------------------"
-  read -r -p "请选择 [0-9]: " num
+  read -r -p "请选择 [0-10]: " num
   case "$num" in
     1) systemctl start "$SERVICE_NAME" ;;
     2) systemctl stop "$SERVICE_NAME" ;;
@@ -240,7 +242,8 @@ show_menu() {
     6) config_agent ;;
     7) open_port_prompt ;;
     8) update_agent ;;
-    9) uninstall_agent ;;
+    9) update_agent_prompt ;;
+    10) uninstall_agent ;;
     0) exit 0 ;;
     *) echo -e "${red}无效选择${plain}" ;;
   esac
@@ -374,11 +377,13 @@ open_port_prompt() {
 update_agent() {
   [ "$(id -u)" -eq 0 ] || { echo -e "${red}请使用 root 运行${plain}"; exit 1; }
   command -v curl >/dev/null 2>&1 || { echo -e "${red}未检测到 curl，无法在线更新${plain}"; exit 1; }
-  local tmp
+  local tmp version
+  version="${1:-latest}"
   tmp="$(mktemp)"
   trap 'rm -f "$tmp"' EXIT
   curl -fsSL "$BOOTSTRAP_URL" -o "$tmp"
   env \
+    PROXY_CONTROL_VERSION="$version" \
     PROXY_CONTROL_MASTER_URL="$(read_config_value PROXY_CONTROL_MASTER_URL)" \
     PROXY_CONTROL_AGENT_TOKEN="$(read_config_value PROXY_CONTROL_AGENT_TOKEN)" \
     PROXY_CONTROL_NODE_NAME="$(read_config_value PROXY_CONTROL_NODE_NAME)" \
@@ -386,6 +391,12 @@ update_agent() {
     PROXY_CONTROL_NODE_HOST="$(read_config_value PROXY_CONTROL_NODE_HOST)" \
     PROXY_CONTROL_HEARTBEAT_INTERVAL="$(read_config_value PROXY_CONTROL_HEARTBEAT_INTERVAL)" \
     bash "$tmp"
+}
+
+update_agent_prompt() {
+  local version
+  read -r -p "请输入版本号，例如 v0.1.7；留空更新最新版: " version
+  update_agent "${version:-latest}"
 }
 
 uninstall_agent() {
@@ -413,9 +424,9 @@ case "${1:-menu}" in
   log|logs) journalctl -u "$SERVICE_NAME" -f ;;
   config) config_agent ;;
   open-port) open_firewall_port "${2:-}" "${3:-tcp}" ;;
-  update) update_agent ;;
+  update) update_agent "${2:-latest}" ;;
   uninstall) uninstall_agent ;;
-  *) echo "用法: fyss {start|stop|restart|status|log|config|open-port|update|uninstall}"; exit 1 ;;
+  *) echo "用法: fyss {start|stop|restart|status|log|config|open-port|update [version]|uninstall}"; exit 1 ;;
 esac
 EOF
   chmod 0755 "$MANAGER_FILE"
@@ -458,7 +469,8 @@ print_result() {
   echo "fyss log          - 查看实时日志"
   echo "fyss config       - 修改配置"
   echo "fyss open-port    - 手动开放节点端口"
-  echo "fyss update       - 更新 Agent"
+  echo "fyss update       - 更新 Agent 到最新版"
+  echo "fyss update v0.1.7 - 更新 Agent 到指定版本"
   echo "fyss uninstall    - 卸载 Agent"
   echo "----------------------------------------------"
   if command -v xray >/dev/null 2>&1; then

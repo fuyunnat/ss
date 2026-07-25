@@ -77,7 +77,8 @@ fyss status       # 查看状态
 fyss restart      # 重启主控
 fyss log          # 查看日志
 fyss config       # 修改端口、账号密码、Agent Token
-fyss update       # 更新主控
+fyss update       # 更新主控到最新版
+fyss update v0.1.7 # 更新主控到指定版本
 fyss uninstall    # 卸载主控
 ```
 
@@ -129,7 +130,8 @@ fyss restart      # 重启被控端
 fyss log          # 查看日志
 fyss config       # 修改主控地址、Token、节点名称、地区
 fyss open-port    # 手动开放节点端口
-fyss update       # 更新被控端
+fyss update       # 更新被控端到最新版
+fyss update v0.1.7 # 更新被控端到指定版本
 fyss uninstall    # 卸载被控端
 ```
 

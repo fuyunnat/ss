@@ -40,7 +40,8 @@ Proxy Control 主控安装器
   fyss restart      重启主控
   fyss log          查看实时日志
   fyss config       修改端口、账号密码、Agent Token
-  fyss update       拉取 GitHub 安装脚本并更新主控
+  fyss update       更新主控到最新版
+  fyss update v0.1.7 更新主控到指定版本
   fyss uninstall    卸载主控
 
 防火墙:
@@ -300,11 +301,12 @@ show_menu() {
   echo "  4. 查看状态"
   echo "  5. 查看实时日志"
   echo "  6. 修改配置"
-  echo "  7. 更新主控"
-  echo "  8. 卸载主控"
+  echo "  7. 更新 fyss 到最新版"
+  echo "  8. 指定版本更新"
+  echo "  9. 卸载主控"
   echo "  0. 退出"
   echo "----------------------------------------------"
-  read -r -p "请选择 [0-8]: " num
+  read -r -p "请选择 [0-9]: " num
   case "$num" in
     1) systemctl start "$SERVICE_NAME" ;;
     2) systemctl stop "$SERVICE_NAME" ;;
@@ -313,7 +315,8 @@ show_menu() {
     5) journalctl -u "$SERVICE_NAME" -f ;;
     6) config_master ;;
     7) update_master ;;
-    8) uninstall_master ;;
+    8) update_master_prompt ;;
+    9) uninstall_master ;;
     0) exit 0 ;;
     *) echo -e "${red}无效选择${plain}" ;;
   esac
@@ -443,17 +446,25 @@ config_master() {
 update_master() {
   [ "$(id -u)" -eq 0 ] || { echo -e "${red}请使用 root 运行${plain}"; exit 1; }
   command -v curl >/dev/null 2>&1 || { echo -e "${red}未检测到 curl，无法在线更新${plain}"; exit 1; }
-  local tmp
+  local tmp version
+  version="${1:-latest}"
   tmp="$(mktemp)"
   trap 'rm -f "$tmp"' EXIT
   curl -fsSL "$BOOTSTRAP_URL" -o "$tmp"
   env \
+    PROXY_CONTROL_VERSION="$version" \
     PROXY_CONTROL_HTTP_ADDR="$(read_config_value PROXY_CONTROL_HTTP_ADDR)" \
     PROXY_CONTROL_ADMIN_USERNAME="$(read_config_value PROXY_CONTROL_ADMIN_USERNAME)" \
     PROXY_CONTROL_ADMIN_PASSWORD="$(read_config_value PROXY_CONTROL_ADMIN_PASSWORD)" \
     PROXY_CONTROL_AGENT_TOKEN="$(read_config_value PROXY_CONTROL_AGENT_TOKEN)" \
     PROXY_CONTROL_SESSION_SECRET="$(read_config_value PROXY_CONTROL_SESSION_SECRET)" \
     bash "$tmp"
+}
+
+update_master_prompt() {
+  local version
+  read -r -p "请输入版本号，例如 v0.1.7；留空更新最新版: " version
+  update_master "${version:-latest}"
 }
 
 uninstall_master() {
@@ -480,9 +491,9 @@ case "${1:-menu}" in
   status) systemctl status "$SERVICE_NAME" --no-pager ;;
   log|logs) journalctl -u "$SERVICE_NAME" -f ;;
   config) config_master ;;
-  update) update_master ;;
+  update) update_master "${2:-latest}" ;;
   uninstall) uninstall_master ;;
-  *) echo "用法: fyss {start|stop|restart|status|log|config|update|uninstall}"; exit 1 ;;
+  *) echo "用法: fyss {start|stop|restart|status|log|config|update [version]|uninstall}"; exit 1 ;;
 esac
 EOF
   chmod 0755 "$MANAGER_FILE"
@@ -522,7 +533,8 @@ print_result() {
   echo "fyss restart      - 重启主控"
   echo "fyss log          - 查看实时日志"
   echo "fyss config       - 修改配置"
-  echo "fyss update       - 更新主控"
+  echo "fyss update       - 更新主控到最新版"
+  echo "fyss update v0.1.7 - 更新主控到指定版本"
   echo "fyss uninstall    - 卸载主控"
   echo "----------------------------------------------"
   warn "生产环境请安装后立即使用 fyss config 修改默认管理员密码。"
