@@ -48,7 +48,7 @@ const primaryGateway = computed(() => gateways.value[0]);
 const primaryExit = computed(() => exits.value.find((item) => item.health === 'healthy') ?? exits.value[0]);
 const primaryPolicy = computed(() => policies.value[0]);
 const latestTask = computed(() => tasks.value[0]);
-const installCommand = computed(() => 'sudo ./scripts/install-agent.sh --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK');
+const installCommand = computed(() => 'curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh | sudo bash -s -- --master-url http://YOUR-MASTER:8080 --token YOUR_AGENT_TOKEN --node-name hk-01 --region HK');
 
 const navItems = computed(() => [
   { id: 'gateways', label: t.value.nav.gateways, count: summary.value.gatewayCount, icon: Network },

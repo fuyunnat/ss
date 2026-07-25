@@ -33,7 +33,18 @@ Default backend address: `http://localhost:8080`.
 
 ## Agent Install
 
-On a controlled Linux server, clone this repository and run:
+On a controlled Linux server, install from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fuyunnat/ss/feature/proxy-control-mvp/install-agent.sh \
+  | sudo bash -s -- \
+    --master-url http://YOUR-MASTER:8080 \
+    --token YOUR_AGENT_TOKEN \
+    --node-name hk-01 \
+    --region HK
+```
+
+Or clone this repository and run the local installer:
 
 ```bash
 sudo ./scripts/install-agent.sh \
