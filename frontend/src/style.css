@@ -760,6 +760,10 @@ button:focus-visible {
   align-items: start;
 }
 
+.install-workbench > * {
+  min-width: 0;
+}
+
 .install-agent-form {
   padding: 9px;
   border: 1px solid #dce3ea;

@@ -144,11 +144,18 @@
 
 .fallback-install {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 7px;
+  min-width: 0;
+  max-width: 100%;
   padding: 8px;
   border: 1px solid #dce3ea;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.fallback-install > * {
+  min-width: 0;
 }
 
 .fallback-install summary {
@@ -160,6 +167,8 @@
 
 .fallback-install code {
   display: block;
+  min-width: 0;
+  width: 100%;
   max-width: 100%;
   padding: 8px;
   overflow-x: auto;
@@ -168,6 +177,7 @@
   color: #bfdbfe;
   font-size: 11px;
   line-height: 1.45;
+  white-space: pre;
 }
 
 @media (max-width: 1180px) {
