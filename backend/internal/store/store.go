@@ -129,6 +129,35 @@ func (s *FileStore) ListServers() []ServerNode {
 	return cloneSlice(s.state.Servers)
 }
 
+func (s *FileStore) GetServer(id string) (ServerNode, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, item := range s.state.Servers {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return ServerNode{}, ErrNotFound
+}
+
+func (s *FileStore) FindServerByIdentity(name string, host string) (ServerNode, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, item := range s.state.Servers {
+		if item.Name == name && item.Host == host {
+			return item, nil
+		}
+	}
+	for _, item := range s.state.Servers {
+		if item.Name == name {
+			return item, nil
+		}
+	}
+	return ServerNode{}, ErrNotFound
+}
+
 func (s *FileStore) UpsertServer(input ServerNode) (ServerNode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -222,6 +251,18 @@ func (s *FileStore) ListExits() []ExitNode {
 	return cloneSlice(s.state.Exits)
 }
 
+func (s *FileStore) GetExit(id string) (ExitNode, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, item := range s.state.Exits {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return ExitNode{}, ErrNotFound
+}
+
 func (s *FileStore) UpsertExit(input ExitNode) (ExitNode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -310,6 +351,18 @@ func (s *FileStore) ListTasks() []Task {
 	return cloneSlice(s.state.Tasks)
 }
 
+func (s *FileStore) GetTask(id string) (Task, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, item := range s.state.Tasks {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return Task{}, ErrNotFound
+}
+
 func (s *FileStore) CreateTask(input Task) (Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -360,6 +413,50 @@ func (s *FileStore) UpdateTask(id string, status string, logs ...TaskLog) (Task,
 		}
 	}
 	return Task{}, ErrNotFound
+}
+
+func (s *FileStore) CreateAgentCommand(input AgentCommand) (AgentCommand, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	input.ID = newID()
+	input.Status = defaultString(input.Status, "queued")
+	input.CreatedAt = now
+	input.UpdatedAt = now
+	s.state.AgentCommands = append(s.state.AgentCommands, input)
+	return input, s.saveLocked()
+}
+
+func (s *FileStore) ListPendingAgentCommands(serverID string) []AgentCommand {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []AgentCommand
+	for _, item := range s.state.AgentCommands {
+		if item.ServerID == serverID && (item.Status == "queued" || item.Status == "running") {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func (s *FileStore) UpdateAgentCommand(id string, status string, message string) (AgentCommand, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	for i := range s.state.AgentCommands {
+		if s.state.AgentCommands[i].ID == id {
+			if status != "" {
+				s.state.AgentCommands[i].Status = status
+			}
+			s.state.AgentCommands[i].Message = message
+			s.state.AgentCommands[i].UpdatedAt = now
+			return s.state.AgentCommands[i], s.saveLocked()
+		}
+	}
+	return AgentCommand{}, ErrNotFound
 }
 
 func (s *FileStore) load() error {

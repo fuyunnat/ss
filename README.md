@@ -102,7 +102,11 @@ Agent 二进制 -> /opt/proxy-control-agent/proxy-control-agent
 管理命令     -> /usr/bin/fyss
 ```
 
-被控端默认只主动连接主控上报心跳，不需要开放入站端口。以后如果某台被控直接监听协议节点端口，按该节点实际端口在服务器防火墙里放行。
+被控端默认主动连接主控上报心跳，不需要提前开放入站端口。
+
+在面板里创建协议节点后，主控会把“开放节点端口”的命令自动下发给对应被控端。被控端如果检测到已启用的 `firewalld` 或 `ufw`，会自动放行该节点端口；如果本机没有启用这两种防火墙，就不会强行开启防火墙。
+
+如果云厂商安全组拦截端口，需要到云厂商控制台开放对应端口。系统防火墙放行失败时，也可以登录被控服务器执行 `fyss open-port 端口 tcp` 兜底处理。
 
 二进制安装包由 GitHub Actions 在发布 tag 时生成：
 
@@ -121,6 +125,7 @@ fyss status       # 查看状态
 fyss restart      # 重启被控端
 fyss log          # 查看日志
 fyss config       # 修改主控地址、Token、节点名称、地区
+fyss open-port    # 手动开放节点端口
 fyss update       # 更新被控端
 fyss uninstall    # 卸载被控端
 ```

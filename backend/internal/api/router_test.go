@@ -135,6 +135,105 @@ func TestAgentHeartbeatRequiresTokenWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestDeployProtocolTaskQueuesAgentFirewallCommand(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "agent-secret")
+
+	server, err := st.UpsertServer(store.ServerNode{Name: "hk-01", Host: "203.0.113.10", Status: "online"})
+	if err != nil {
+		t.Fatalf("upsert server: %v", err)
+	}
+	exit, err := st.UpsertExit(store.ExitNode{
+		Name:     "hk-vless",
+		Type:     "self_xray_vless",
+		ServerID: server.ID,
+		Address:  server.Host,
+		Port:     31000,
+		Settings: map[string]any{"udp": true},
+		Enabled:  true,
+	})
+	if err != nil {
+		t.Fatalf("upsert exit: %v", err)
+	}
+	task, err := st.CreateTask(store.Task{
+		Type:       "deploy_protocol_node",
+		TargetType: "exit",
+		TargetID:   exit.ID,
+		Summary:    "搭建协议节点: hk-vless",
+	})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID+"/run", nil)
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected run status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), `"status":"running"`) || !strings.Contains(res.Body.String(), "已下发到 Agent") {
+		t.Fatalf("expected task to wait for agent command, got %s", res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/agent/commands?nodeName=hk-01&host=203.0.113.10", nil)
+	req.Header.Set("Authorization", "Bearer agent-secret")
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected command list status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var commands []store.AgentCommand
+	if err := json.Unmarshal(res.Body.Bytes(), &commands); err != nil {
+		t.Fatalf("decode commands: %v", err)
+	}
+	if len(commands) != 1 || commands[0].Type != "open_firewall_port" || commands[0].Port != 31000 || commands[0].Network != "both" {
+		t.Fatalf("unexpected command: %+v", commands)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/agent/commands/"+commands[0].ID+"/complete", strings.NewReader(`{"status":"succeeded","message":"已开放节点端口: 31000/both"}`))
+	req.Header.Set("Authorization", "Bearer agent-secret")
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected complete status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	updated, err := st.GetTask(task.ID)
+	if err != nil {
+		t.Fatalf("get task: %v", err)
+	}
+	if updated.Status != "succeeded" {
+		t.Fatalf("expected task succeeded, got %+v", updated)
+	}
+}
+
+func TestAgentCommandsRequireConfiguredToken(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, _ := newTestRouter(t, st, "agent-secret")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/agent/commands?nodeName=hk-01", nil)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected command endpoint status 401, got %d: %s", res.Code, res.Body.String())
+	}
+
+	router, _ = newTestRouter(t, st, "")
+	req = httptest.NewRequest(http.MethodGet, "/api/agent/commands?nodeName=hk-01", nil)
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected missing configured token status 401, got %d: %s", res.Code, res.Body.String())
+	}
+}
+
 func TestAgentInstallValidatesRequiredFields(t *testing.T) {
 	st, err := store.NewFileStore(t.TempDir() + "/state.json")
 	if err != nil {

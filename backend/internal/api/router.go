@@ -153,6 +153,8 @@ func NewRouter(st *store.FileStore, opts Options) http.Handler {
 	mux.HandleFunc("/api/settings/agent", r.handleAgentSettings)
 	mux.HandleFunc("/api/ai/chat", r.handleAIChat)
 	mux.HandleFunc("/api/agent/heartbeat", r.handleAgentHeartbeat)
+	mux.HandleFunc("/api/agent/commands", r.handleAgentCommands)
+	mux.HandleFunc("/api/agent/commands/", r.handleAgentCommandByID)
 	mux.HandleFunc("/api/agent/install", r.handleAgentInstall)
 	mux.HandleFunc("/api/summary", r.handleSummary)
 	mux.HandleFunc("/api/servers", r.handleServers)
@@ -190,9 +192,7 @@ func (r *Router) handleAgentHeartbeat(w http.ResponseWriter, req *http.Request) 
 		methodNotAllowed(w)
 		return
 	}
-	agentConfig := r.agentConfigSnapshot()
-	if agentConfig.Token != "" && req.Header.Get("Authorization") != "Bearer "+agentConfig.Token {
-		writeError(w, http.StatusUnauthorized, "agent token is invalid")
+	if !r.validateAgentRequest(w, req) {
 		return
 	}
 
@@ -354,7 +354,7 @@ func (r *Router) handleTaskByID(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	item, err := r.store.RunTask(id)
+	item, err := r.runTask(id)
 	writeResult(w, item, err)
 }
 

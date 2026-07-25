@@ -98,7 +98,7 @@ func (r *Router) withAuth(next http.Handler) http.Handler {
 }
 
 func isPublicAPI(path string) bool {
-	return path == "/api/health" || path == "/api/auth/login" || path == "/api/agent/heartbeat"
+	return path == "/api/health" || path == "/api/auth/login" || path == "/api/agent/heartbeat" || path == "/api/agent/commands" || strings.HasPrefix(path, "/api/agent/commands/")
 }
 
 func (r *Router) issueToken(username string) (string, error) {

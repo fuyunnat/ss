@@ -10,7 +10,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strings"
@@ -18,7 +20,7 @@ import (
 	"time"
 )
 
-const version = "0.1.1"
+const version = "0.1.2"
 
 type config struct {
 	MasterURL string
@@ -39,6 +41,19 @@ type heartbeat struct {
 	MemoryMB     int      `json:"memoryMb"`
 }
 
+type agentCommand struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Port    int    `json:"port"`
+	Network string `json:"network"`
+	Summary string `json:"summary"`
+}
+
+type commandResult struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
 func main() {
 	cfg := loadConfig()
 	if cfg.MasterURL == "" {
@@ -57,6 +72,8 @@ func main() {
 	log.Printf("proxy-control-agent %s started, node=%s master=%s", version, cfg.NodeName, cfg.MasterURL)
 	if err := sendHeartbeat(ctx, cfg); err != nil {
 		log.Printf("first heartbeat failed: %v", err)
+	} else if err := processCommands(ctx, cfg); err != nil {
+		log.Printf("first command sync failed: %v", err)
 	}
 
 	ticker := time.NewTicker(cfg.Interval)
@@ -69,6 +86,10 @@ func main() {
 		case <-ticker.C:
 			if err := sendHeartbeat(ctx, cfg); err != nil {
 				log.Printf("heartbeat failed: %v", err)
+				continue
+			}
+			if err := processCommands(ctx, cfg); err != nil {
+				log.Printf("command sync failed: %v", err)
 			}
 		}
 	}
@@ -123,6 +144,162 @@ func sendHeartbeat(ctx context.Context, cfg config) error {
 	}
 	log.Printf("heartbeat sent: node=%s host=%s", cfg.NodeName, cfg.Host)
 	return nil
+}
+
+func processCommands(ctx context.Context, cfg config) error {
+	commands, err := fetchCommands(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	for _, command := range commands {
+		status, message := executeCommand(ctx, command)
+		if err := reportCommand(ctx, cfg, command.ID, status, message); err != nil {
+			return err
+		}
+		log.Printf("command completed: id=%s type=%s status=%s message=%s", command.ID, command.Type, status, message)
+	}
+	return nil
+}
+
+func fetchCommands(ctx context.Context, cfg config) ([]agentCommand, error) {
+	endpoint := strings.TrimRight(cfg.MasterURL, "/") + "/api/agent/commands?nodeName=" + url.QueryEscape(cfg.NodeName) + "&host=" + url.QueryEscape(cfg.Host)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("master command endpoint returned %s", res.Status)
+	}
+	var commands []agentCommand
+	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&commands); err != nil {
+		return nil, err
+	}
+	return commands, nil
+}
+
+func reportCommand(ctx context.Context, cfg config, id string, status string, message string) error {
+	body, err := json.Marshal(commandResult{Status: status, Message: message})
+	if err != nil {
+		return err
+	}
+	endpoint := strings.TrimRight(cfg.MasterURL, "/") + "/api/agent/commands/" + url.PathEscape(id) + "/complete"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if cfg.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		content, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+		return fmt.Errorf("master command report returned %s: %s", res.Status, strings.TrimSpace(string(content)))
+	}
+	return nil
+}
+
+func executeCommand(ctx context.Context, command agentCommand) (string, string) {
+	switch command.Type {
+	case "open_firewall_port":
+		message, err := openFirewallPort(ctx, command.Port, command.Network)
+		if err != nil {
+			return "failed", err.Error()
+		}
+		return "succeeded", message
+	default:
+		return "failed", "不支持的 Agent 命令类型: " + command.Type
+	}
+}
+
+func openFirewallPort(ctx context.Context, port int, network string) (string, error) {
+	if port < 1 || port > 65535 {
+		return "", fmt.Errorf("端口不合法: %d", port)
+	}
+	protocols, err := firewallProtocols(network)
+	if err != nil {
+		return "", err
+	}
+
+	firewalldActive := commandExists("firewall-cmd") && serviceActive(ctx, "firewalld")
+	ufwActive := commandExists("ufw") && isUFWActive(ctx)
+	if !firewalldActive && !ufwActive {
+		return fmt.Sprintf("未检测到已启用的 firewalld/ufw，端口 %d 不需要 Agent 额外放行", port), nil
+	}
+
+	var actions []string
+	for _, proto := range protocols {
+		if firewalldActive {
+			portSpec := fmt.Sprintf("%d/%s", port, proto)
+			if out, err := runOutput(ctx, "firewall-cmd", "--permanent", "--add-port="+portSpec); err != nil {
+				return "", fmt.Errorf("firewalld 放行 %s 失败: %v: %s", portSpec, err, out)
+			}
+			actions = append(actions, "firewalld "+portSpec)
+		}
+		if ufwActive {
+			if out, err := runOutput(ctx, "ufw", "allow", fmt.Sprintf("%d/%s", port, proto)); err != nil {
+				return "", fmt.Errorf("ufw 放行 %d/%s 失败: %v: %s", port, proto, err, out)
+			}
+			actions = append(actions, fmt.Sprintf("ufw %d/%s", port, proto))
+		}
+	}
+	if firewalldActive {
+		if out, err := runOutput(ctx, "firewall-cmd", "--reload"); err != nil {
+			return "", fmt.Errorf("firewalld reload 失败: %v: %s", err, out)
+		}
+	}
+	return "已开放节点端口: " + strings.Join(actions, ", "), nil
+}
+
+func firewallProtocols(network string) ([]string, error) {
+	switch strings.ToLower(strings.TrimSpace(network)) {
+	case "", "tcp":
+		return []string{"tcp"}, nil
+	case "udp":
+		return []string{"udp"}, nil
+	case "both", "tcp+udp":
+		return []string{"tcp", "udp"}, nil
+	default:
+		return nil, fmt.Errorf("协议网络不合法: %s", network)
+	}
+}
+
+func commandExists(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
+
+func serviceActive(ctx context.Context, name string) bool {
+	if !commandExists("systemctl") {
+		return false
+	}
+	return exec.CommandContext(ctx, "systemctl", "is-active", "--quiet", name).Run() == nil
+}
+
+func isUFWActive(ctx context.Context) bool {
+	out, err := runOutput(ctx, "ufw", "status")
+	return err == nil && strings.Contains(strings.ToLower(out), "status: active")
+}
+
+func runOutput(ctx context.Context, name string, args ...string) (string, error) {
+	commandCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(commandCtx, name, args...).CombinedOutput()
+	return strings.TrimSpace(string(out)), err
 }
 
 func fallbackHostname() string {

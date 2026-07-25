@@ -38,6 +38,7 @@ Proxy Control Agent 安装器
   fyss restart      重启 Agent
   fyss log          查看实时日志
   fyss config       修改总控地址、Token、节点名称等配置
+  fyss open-port    手动开放节点端口
   fyss update       拉取 GitHub 安装脚本并更新 Agent
   fyss uninstall    卸载 Agent
 EOF
@@ -177,7 +178,6 @@ Restart=always
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
 ProtectHome=true
 
 [Install]
@@ -208,11 +208,12 @@ show_menu() {
   echo "  4. 查看状态"
   echo "  5. 查看实时日志"
   echo "  6. 修改配置"
-  echo "  7. 更新 Agent"
-  echo "  8. 卸载 Agent"
+  echo "  7. 开放节点端口"
+  echo "  8. 更新 Agent"
+  echo "  9. 卸载 Agent"
   echo "  0. 退出"
   echo "----------------------------------------------"
-  read -r -p "请选择 [0-8]: " num
+  read -r -p "请选择 [0-9]: " num
   case "$num" in
     1) systemctl start "$SERVICE_NAME" ;;
     2) systemctl stop "$SERVICE_NAME" ;;
@@ -220,8 +221,9 @@ show_menu() {
     4) systemctl status "$SERVICE_NAME" --no-pager ;;
     5) journalctl -u "$SERVICE_NAME" -f ;;
     6) config_agent ;;
-    7) update_agent ;;
-    8) uninstall_agent ;;
+    7) open_port_prompt ;;
+    8) update_agent ;;
+    9) uninstall_agent ;;
     0) exit 0 ;;
     *) echo -e "${red}无效选择${plain}" ;;
   esac
@@ -281,6 +283,60 @@ config_agent() {
   echo -e "${green}配置已保存，Agent 已重启${plain}"
 }
 
+firewall_active() {
+  local service="$1"
+  command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$service"
+}
+
+ufw_active() {
+  command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi 'Status: active'
+}
+
+open_firewall_port() {
+  [ "$(id -u)" -eq 0 ] || { echo -e "${red}请使用 root 运行${plain}"; exit 1; }
+  local port="${1:-}"
+  local network="${2:-tcp}"
+  local protocols changed proto
+  [ -n "$port" ] || { echo -e "${red}端口不能为空${plain}"; exit 1; }
+  case "$port" in
+    *[!0-9]*) echo -e "${red}端口必须是数字${plain}"; exit 1 ;;
+  esac
+  [ "$port" -ge 1 ] && [ "$port" -le 65535 ] || { echo -e "${red}端口范围必须是 1-65535${plain}"; exit 1; }
+  case "$network" in
+    tcp) protocols="tcp" ;;
+    udp) protocols="udp" ;;
+    both|tcp+udp) protocols="tcp udp" ;;
+    *) echo -e "${red}协议只能是 tcp、udp 或 both${plain}"; exit 1 ;;
+  esac
+
+  changed=0
+  if command -v firewall-cmd >/dev/null 2>&1 && firewall_active firewalld; then
+    for proto in $protocols; do
+      firewall-cmd --permanent --add-port="${port}/${proto}"
+      changed=1
+    done
+    firewall-cmd --reload
+  fi
+  if command -v ufw >/dev/null 2>&1 && ufw_active; then
+    for proto in $protocols; do
+      ufw allow "${port}/${proto}"
+      changed=1
+    done
+  fi
+  if [ "$changed" -eq 0 ]; then
+    echo -e "${yellow}未检测到已启用的 firewalld/ufw，未执行放行；如果云安全组拦截，需要到云厂商控制台开放端口。${plain}"
+    return
+  fi
+  echo -e "${green}已开放节点端口: ${port}/${network}${plain}"
+}
+
+open_port_prompt() {
+  local port network
+  read -r -p "节点端口: " port
+  read -r -p "协议 [tcp/udp/both，默认 tcp]: " network
+  open_firewall_port "$port" "${network:-tcp}"
+}
+
 update_agent() {
   [ "$(id -u)" -eq 0 ] || { echo -e "${red}请使用 root 运行${plain}"; exit 1; }
   command -v curl >/dev/null 2>&1 || { echo -e "${red}未检测到 curl，无法在线更新${plain}"; exit 1; }
@@ -322,9 +378,10 @@ case "${1:-menu}" in
   status) systemctl status "$SERVICE_NAME" --no-pager ;;
   log|logs) journalctl -u "$SERVICE_NAME" -f ;;
   config) config_agent ;;
+  open-port) open_firewall_port "${2:-}" "${3:-tcp}" ;;
   update) update_agent ;;
   uninstall) uninstall_agent ;;
-  *) echo "用法: fyss {start|stop|restart|status|log|config|update|uninstall}"; exit 1 ;;
+  *) echo "用法: fyss {start|stop|restart|status|log|config|open-port|update|uninstall}"; exit 1 ;;
 esac
 EOF
   chmod 0755 "$MANAGER_FILE"
@@ -365,6 +422,7 @@ print_result() {
   echo "fyss restart      - 重启 Agent"
   echo "fyss log          - 查看实时日志"
   echo "fyss config       - 修改配置"
+  echo "fyss open-port    - 手动开放节点端口"
   echo "fyss update       - 更新 Agent"
   echo "fyss uninstall    - 卸载 Agent"
   echo "----------------------------------------------"

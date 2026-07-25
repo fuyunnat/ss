@@ -91,16 +91,33 @@ type TaskLog struct {
 	Message string    `json:"message"`
 }
 
+type AgentCommand struct {
+	ID         string    `json:"id"`
+	Type       string    `json:"type"`
+	Status     string    `json:"status"`
+	ServerID   string    `json:"serverId"`
+	ServerName string    `json:"serverName"`
+	ServerHost string    `json:"serverHost"`
+	TaskID     string    `json:"taskId"`
+	Port       int       `json:"port"`
+	Network    string    `json:"network"`
+	Summary    string    `json:"summary"`
+	Message    string    `json:"message,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+}
+
 type State struct {
-	Servers  []ServerNode   `json:"servers"`
-	Gateways []Gateway      `json:"gateways"`
-	Exits    []ExitNode     `json:"exits"`
-	Policies []Policy       `json:"policies"`
-	Tasks    []Task         `json:"tasks"`
-	Admin    *AdminConfig   `json:"admin,omitempty"`
-	AI       *AIConfig      `json:"ai,omitempty"`
-	Console  *ConsoleConfig `json:"console,omitempty"`
-	Agent    *AgentConfig   `json:"agent,omitempty"`
+	Servers       []ServerNode   `json:"servers"`
+	Gateways      []Gateway      `json:"gateways"`
+	Exits         []ExitNode     `json:"exits"`
+	Policies      []Policy       `json:"policies"`
+	Tasks         []Task         `json:"tasks"`
+	AgentCommands []AgentCommand `json:"agentCommands,omitempty"`
+	Admin         *AdminConfig   `json:"admin,omitempty"`
+	AI            *AIConfig      `json:"ai,omitempty"`
+	Console       *ConsoleConfig `json:"console,omitempty"`
+	Agent         *AgentConfig   `json:"agent,omitempty"`
 }
 
 type Summary struct {

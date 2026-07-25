@@ -283,8 +283,8 @@ function App() {
       });
       await createAndRunTask({
         type: protocolForm.exitId ? 'sync_config' : 'deploy_protocol_node',
-        targetType: protocolForm.serverId ? 'server' : 'exit',
-        targetId: protocolForm.serverId || savedExit.id || '',
+        targetType: 'exit',
+        targetId: savedExit.id || '',
         summary: `${protocolForm.exitId ? copyText('更新协议节点', 'Update protocol node') : copyText('搭建协议节点', 'Deploy protocol node')}: ${nodeName} | ${protocolDeploySummary}`,
         status: 'queued',
         logs: [],
