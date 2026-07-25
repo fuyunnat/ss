@@ -58,6 +58,29 @@ export function GatewayBuilder({ copyText, form, onChange, onSubmit, onReset, on
         <small>{copyText(`已启用 ${enabledCount} 个入口协议`, `${enabledCount} entry protocols enabled`)}</small>
       </div>
 
+      <section className="entry-links entry-links-priority">
+        <div className="link-preview-head">
+          <div>
+            <span>{copyText('客户端连接信息', 'Client Connection Info')}</span>
+            <strong>{copyText('入口保存后直接复制给用户连接主控', 'Copy these links to clients after saving the entry')}</strong>
+          </div>
+        </div>
+        {connections.length === 0 ? (
+          <div className="empty-state"><strong>{copyText('未启用入口协议', 'No entry protocol enabled')}</strong></div>
+        ) : connections.map((item) => (
+          <article className="entry-link-card" key={item.protocol}>
+            <div className="entry-link-head">
+              <strong>{item.label}</strong>
+              <button className="secondary-button compact" type="button" disabled={!item.canCopy} onClick={() => onCopyLink(item.link)}><Copy size={15} />{copyText('复制', 'Copy')}</button>
+            </div>
+            <div className="link-row-grid">
+              {item.rows.map((row) => <span key={row.label}><b>{row.label}</b><i>{row.value}</i></span>)}
+            </div>
+            <code>{item.link || copyText('缺少连接参数', 'Missing connection parameters')}</code>
+          </article>
+        ))}
+      </section>
+
       <div className="form-row">
         <Field label={copyText('入口名称', 'Entry Name')}><input value={form.name} onChange={(event) => update({ name: event.target.value })} required placeholder="main-entry" /></Field>
         <Field label={copyText('监听地址', 'Listen Host')}><input value={form.listenHost} onChange={(event) => update({ listenHost: event.target.value })} required placeholder="0.0.0.0" /></Field>
@@ -87,29 +110,6 @@ export function GatewayBuilder({ copyText, form, onChange, onSubmit, onReset, on
         <span>{copyText('入口预览', 'Entry Preview')}</span>
         <strong>{entrySummary({ ...form, protocols }, copyText)}</strong>
       </div>
-
-      <section className="entry-links">
-        <div className="link-preview-head">
-          <div>
-            <span>{copyText('客户端连接信息', 'Client Connection Info')}</span>
-            <strong>{copyText('保存入口后，用户按下面的协议链接连接主控', 'After saving the entry, clients connect to the master with these links')}</strong>
-          </div>
-        </div>
-        {connections.length === 0 ? (
-          <div className="empty-state"><strong>{copyText('未启用入口协议', 'No entry protocol enabled')}</strong></div>
-        ) : connections.map((item) => (
-          <article className="entry-link-card" key={item.protocol}>
-            <div className="entry-link-head">
-              <strong>{item.label}</strong>
-              <button className="secondary-button compact" type="button" disabled={!item.canCopy} onClick={() => onCopyLink(item.link)}><Copy size={15} />{copyText('复制', 'Copy')}</button>
-            </div>
-            <div className="link-row-grid">
-              {item.rows.map((row) => <span key={row.label}><b>{row.label}</b><i>{row.value}</i></span>)}
-            </div>
-            <code>{item.link || copyText('缺少连接参数', 'Missing connection parameters')}</code>
-          </article>
-        ))}
-      </section>
 
       <div className="form-actions">
         <button className="primary-button" type="submit"><Plus size={17} />{isEditing ? copyText('更新入口', 'Update Entry') : copyText('新增入口', 'Add Entry')}</button>

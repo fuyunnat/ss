@@ -335,6 +335,10 @@ p {
   min-width: 0;
 }
 
+.control-grid.gateway-mode {
+  grid-template-columns: minmax(760px, 0.72fr) minmax(360px, 0.28fr);
+}
+
 .control-grid.setup-mode {
   grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
 }
@@ -1077,6 +1081,19 @@ button:focus-visible,
   background: #f8fbff;
 }
 
+.entry-links-priority {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 5px;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.entry-links-priority .link-preview-head,
+.entry-links-priority .empty-state {
+  grid-column: 1 / -1;
+}
+
 .entry-link-card {
   display: grid;
   gap: 7px;
@@ -1164,6 +1181,55 @@ button:focus-visible,
   font-size: 11px;
   line-height: 1.45;
   white-space: pre;
+}
+
+.entry-links-priority .entry-link-card {
+  grid-template-columns: 118px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 6px;
+}
+
+.entry-links-priority .entry-link-head {
+  display: contents;
+}
+
+.entry-links-priority .entry-link-head strong {
+  grid-column: 1;
+  font-size: 12px;
+}
+
+.entry-links-priority .entry-link-head button {
+  grid-column: 3;
+  grid-row: 1;
+  min-height: 26px;
+}
+
+.entry-links-priority .link-row-grid {
+  display: flex;
+  grid-column: 2;
+  grid-row: 1;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.entry-links-priority .link-row-grid span {
+  display: inline-flex;
+  flex: 0 1 160px;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 5px;
+  white-space: nowrap;
+}
+
+.entry-links-priority .link-row-grid span:first-child {
+  display: none;
+}
+
+.entry-links-priority .entry-link-card code {
+  display: none;
 }
 
 .auto-online {
@@ -1652,6 +1718,7 @@ button:focus-visible,
   }
 
   .control-grid,
+  .control-grid.gateway-mode,
   .control-grid.setup-mode,
   .control-grid.node-mode,
   .ai-assistant {
@@ -1733,6 +1800,7 @@ button:focus-visible,
   .build-steps,
   .auto-steps,
   .auto-fields,
+  .entry-links-priority,
   .entry-protocol-grid,
   .form-row,
   .form-row.three {

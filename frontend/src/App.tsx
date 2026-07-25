@@ -429,7 +429,7 @@ function App() {
           <HealthTile icon={Database} label={copyText('任务完成', 'Tasks Done')} value={`${taskSuccess}/${summary.taskCount}`} detail={copyText('可审计操作流', 'Auditable actions')} />
         </section>
 
-        <section className={`control-grid ${active === 'exits' ? 'node-mode' : ''} ${active === 'servers' ? 'setup-mode' : ''} ${active === 'ai' || active === 'settings' ? 'ai-mode' : ''}`}>
+        <section className={`control-grid ${active === 'gateways' ? 'gateway-mode' : ''} ${active === 'exits' ? 'node-mode' : ''} ${active === 'servers' ? 'setup-mode' : ''} ${active === 'ai' || active === 'settings' ? 'ai-mode' : ''}`}>
           <section className="config-panel">
             <PanelHeader icon={activeNav.icon} title={activeNav.label} desc={panelDesc(active, copyText)} />
             {active === 'gateways' && (
