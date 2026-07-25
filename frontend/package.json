@@ -5,17 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@lucide/vue": "1.26.0",
-    "vue": "3.5.40"
+    "lucide-react": "1.26.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "6.0.8",
+    "@vitejs/plugin-react": "6.0.4",
+    "@types/react": "19.2.8",
+    "@types/react-dom": "19.2.3",
     "typescript": "5.9.3",
-    "vite": "8.1.5",
-    "vue-tsc": "3.3.8"
+    "vite": "8.1.5"
   }
 }

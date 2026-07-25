@@ -50,7 +50,7 @@ func (s *FileStore) Summary() Summary {
 func (s *FileStore) ListServers() []ServerNode {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]ServerNode(nil), s.state.Servers...)
+	return cloneSlice(s.state.Servers)
 }
 
 func (s *FileStore) UpsertServer(input ServerNode) (ServerNode, error) {
@@ -101,7 +101,7 @@ func (s *FileStore) DeleteServer(id string) error {
 func (s *FileStore) ListGateways() []Gateway {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]Gateway(nil), s.state.Gateways...)
+	return cloneSlice(s.state.Gateways)
 }
 
 func (s *FileStore) UpsertGateway(input Gateway) (Gateway, error) {
@@ -143,7 +143,7 @@ func (s *FileStore) DeleteGateway(id string) error {
 func (s *FileStore) ListExits() []ExitNode {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]ExitNode(nil), s.state.Exits...)
+	return cloneSlice(s.state.Exits)
 }
 
 func (s *FileStore) UpsertExit(input ExitNode) (ExitNode, error) {
@@ -189,7 +189,7 @@ func (s *FileStore) DeleteExit(id string) error {
 func (s *FileStore) ListPolicies() []Policy {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]Policy(nil), s.state.Policies...)
+	return cloneSlice(s.state.Policies)
 }
 
 func (s *FileStore) UpsertPolicy(input Policy) (Policy, error) {
@@ -231,7 +231,7 @@ func (s *FileStore) DeletePolicy(id string) error {
 func (s *FileStore) ListTasks() []Task {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]Task(nil), s.state.Tasks...)
+	return cloneSlice(s.state.Tasks)
 }
 
 func (s *FileStore) CreateTask(input Task) (Task, error) {
@@ -305,4 +305,11 @@ func defaultString(value string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func cloneSlice[T any](items []T) []T {
+	if items == nil {
+		return []T{}
+	}
+	return append([]T(nil), items...)
 }

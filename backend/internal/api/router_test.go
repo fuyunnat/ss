@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,6 +46,28 @@ func TestCreateExitRequiresAddress(t *testing.T) {
 	router.ServeHTTP(res, req)
 	if res.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", res.Code)
+	}
+}
+
+func TestEmptyListsReturnArrays(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router := NewRouter(st, "http://localhost:5173", "")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/gateways", nil)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	var body []store.Gateway
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("expected json array, got %s: %v", res.Body.String(), err)
+	}
+	if body == nil || len(body) != 0 {
+		t.Fatalf("expected empty array, got %#v", body)
 	}
 }
 
