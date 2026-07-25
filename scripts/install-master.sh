@@ -96,11 +96,27 @@ generate_secret() {
 }
 
 validate_config() {
+  HTTP_ADDR="$(clean_config_value "$HTTP_ADDR")"
+  ADMIN_USERNAME="$(clean_config_value "$ADMIN_USERNAME")"
+  ADMIN_PASSWORD="$(clean_config_value "$ADMIN_PASSWORD")"
+  AGENT_TOKEN="$(clean_config_value "$AGENT_TOKEN")"
+  SESSION_SECRET="$(clean_config_value "$SESSION_SECRET")"
   [ -n "$HTTP_ADDR" ] || fail "监听地址不能为空"
   [ -n "$ADMIN_USERNAME" ] || fail "管理员账号不能为空"
   [ -n "$ADMIN_PASSWORD" ] || fail "管理员密码不能为空"
   [ -n "$AGENT_TOKEN" ] || AGENT_TOKEN="$(generate_secret)"
   [ -n "$SESSION_SECRET" ] || SESSION_SECRET="$(generate_secret)"
+}
+
+clean_config_value() {
+  local value="${1:-}"
+  value="${value%$'\r'}"
+  while [[ "$value" == \"* && "$value" == *\" && "${#value}" -gt 1 ]]; do
+    value="${value:1:${#value}-2}"
+  done
+  value="${value#\"}"
+  value="${value%\"}"
+  printf '%s' "$value"
 }
 
 write_env_line() {
@@ -303,6 +319,17 @@ show_menu() {
   esac
 }
 
+clean_config_value() {
+  local value="${1:-}"
+  value="${value%$'\r'}"
+  while [[ "$value" == \"* && "$value" == *\" && "${#value}" -gt 1 ]]; do
+    value="${value:1:${#value}-2}"
+  done
+  value="${value#\"}"
+  value="${value%\"}"
+  printf '%s' "$value"
+}
+
 read_config_value() {
   local key="$1"
   local line value
@@ -310,13 +337,9 @@ read_config_value() {
     line="$(grep -E "^${key}=" "$CONFIG_FILE" | tail -n 1 || true)"
     [ -n "$line" ] || return 0
     value="${line#*=}"
-    value="${value%$'\r'}"
-    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
-      value="${value:1:${#value}-2}"
-    fi
     value="${value//\\\"/\"}"
     value="${value//\\\\/\\}"
-    printf '%s' "$value"
+    clean_config_value "$value"
   fi
 }
 

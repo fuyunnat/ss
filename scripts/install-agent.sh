@@ -118,10 +118,27 @@ interactive_config() {
 }
 
 validate_config() {
+  MASTER_URL="$(clean_config_value "$MASTER_URL")"
+  AGENT_TOKEN="$(clean_config_value "$AGENT_TOKEN")"
+  NODE_NAME="$(clean_config_value "$NODE_NAME")"
+  NODE_REGION="$(clean_config_value "$NODE_REGION")"
+  NODE_HOST="$(clean_config_value "$NODE_HOST")"
+  HEARTBEAT_INTERVAL="$(clean_config_value "$HEARTBEAT_INTERVAL")"
   MASTER_URL="${MASTER_URL%/}"
   [ -n "$MASTER_URL" ] || fail "总控地址不能为空"
   [ -n "$AGENT_TOKEN" ] || fail "Agent Token 不能为空"
   [ -n "$NODE_NAME" ] || NODE_NAME="$(hostname)"
+}
+
+clean_config_value() {
+  local value="${1:-}"
+  value="${value%$'\r'}"
+  while [[ "$value" == \"* && "$value" == *\" && "${#value}" -gt 1 ]]; do
+    value="${value:1:${#value}-2}"
+  done
+  value="${value#\"}"
+  value="${value%\"}"
+  printf '%s' "$value"
 }
 
 write_env_line() {
@@ -229,6 +246,17 @@ show_menu() {
   esac
 }
 
+clean_config_value() {
+  local value="${1:-}"
+  value="${value%$'\r'}"
+  while [[ "$value" == \"* && "$value" == *\" && "${#value}" -gt 1 ]]; do
+    value="${value:1:${#value}-2}"
+  done
+  value="${value#\"}"
+  value="${value%\"}"
+  printf '%s' "$value"
+}
+
 read_config_value() {
   local key="$1"
   local line value
@@ -236,13 +264,9 @@ read_config_value() {
     line="$(grep -E "^${key}=" "$CONFIG_FILE" | tail -n 1 || true)"
     [ -n "$line" ] || return 0
     value="${line#*=}"
-    value="${value%$'\r'}"
-    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
-      value="${value:1:${#value}-2}"
-    fi
     value="${value//\\\"/\"}"
     value="${value//\\\\/\\}"
-    printf '%s' "$value"
+    clean_config_value "$value"
   fi
 }
 
