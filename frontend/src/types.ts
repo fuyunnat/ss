@@ -179,8 +179,8 @@ export interface AISettingsUpdate {
 export interface AgentSettingsUpdate {
   masterUrl: string;
   agentToken: string;
-  masterServiceName: string;
-  agentServiceName: string;
+  masterServiceName?: string;
+  agentServiceName?: string;
 }
 
 export interface AIChatRequest {

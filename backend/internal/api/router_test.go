@@ -238,6 +238,26 @@ func TestAgentSettingsPersistAndDriveHeartbeatAuth(t *testing.T) {
 	if !ok || agentConfig.Token != "agent-secret" || agentConfig.MasterURL != "https://master.example.com:8443" || agentConfig.AgentServiceName != "fyss-agent" {
 		t.Fatalf("unexpected persisted agent config: ok=%v config=%+v", ok, agentConfig)
 	}
+
+	req = httptest.NewRequest(http.MethodPut, "/api/settings/agent", strings.NewReader(`{
+		"masterUrl":"https://new-master.example.com",
+		"agentToken":""
+	}`))
+	authorize(req, token)
+	res = httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected partial update status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	reopened, err = store.NewFileStore(path)
+	if err != nil {
+		t.Fatalf("reopen store: %v", err)
+	}
+	agentConfig, ok = reopened.AgentConfig()
+	if !ok || agentConfig.Token != "agent-secret" || agentConfig.MasterURL != "https://new-master.example.com" || agentConfig.MasterServiceName != "fyss-master" || agentConfig.AgentServiceName != "fyss-agent" {
+		t.Fatalf("partial update should preserve internal service names: ok=%v config=%+v", ok, agentConfig)
+	}
 }
 
 func TestAgentSettingsRejectInvalidValues(t *testing.T) {

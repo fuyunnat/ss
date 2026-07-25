@@ -287,8 +287,9 @@ func (r *Router) handleAgentSettings(w http.ResponseWriter, req *http.Request) {
 	}
 	masterURL := strings.TrimRight(strings.TrimSpace(input.MasterURL), "/")
 	agentToken := strings.TrimSpace(input.AgentToken)
-	masterServiceName := defaultString(strings.TrimSpace(input.MasterServiceName), "proxy-control")
-	agentServiceName := defaultString(strings.TrimSpace(input.AgentServiceName), "proxy-control-agent")
+	current := r.agentConfigSnapshot()
+	masterServiceName := defaultString(strings.TrimSpace(input.MasterServiceName), current.MasterServiceName)
+	agentServiceName := defaultString(strings.TrimSpace(input.AgentServiceName), current.AgentServiceName)
 	if err := validateAgentMasterURL(masterURL); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -306,7 +307,6 @@ func (r *Router) handleAgentSettings(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	current := r.agentConfigSnapshot()
 	if agentToken == "" {
 		agentToken = current.Token
 	}

@@ -27,8 +27,6 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
   const [agentForm, setAgentForm] = useState({
     masterUrl: settings?.agentMasterUrl || '',
     agentToken: '',
-    masterServiceName: settings?.masterServiceName || 'proxy-control',
-    agentServiceName: settings?.agentServiceName || 'proxy-control-agent',
   });
   const [agentSaving, setAgentSaving] = useState(false);
   const [agentError, setAgentError] = useState('');
@@ -57,10 +55,8 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
     setAgentForm((current) => ({
       ...current,
       masterUrl: settings?.agentMasterUrl || '',
-      masterServiceName: settings?.masterServiceName || current.masterServiceName || 'proxy-control',
-      agentServiceName: settings?.agentServiceName || current.agentServiceName || 'proxy-control-agent',
     }));
-  }, [settings?.agentMasterUrl, settings?.agentServiceName, settings?.masterServiceName]);
+  }, [settings?.agentMasterUrl]);
 
   async function copy(text: string) {
     await navigator.clipboard?.writeText(text);
@@ -140,8 +136,6 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
       await api.updateAgentSettings({
         masterUrl: agentForm.masterUrl.trim(),
         agentToken: agentForm.agentToken.trim(),
-        masterServiceName: agentForm.masterServiceName.trim() || 'proxy-control',
-        agentServiceName: agentForm.agentServiceName.trim() || 'proxy-control-agent',
       });
       setAgentForm((current) => ({ ...current, agentToken: '' }));
       await onRefresh();
@@ -191,8 +185,7 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
           rows={[
             [copyText('总控地址', 'Master URL'), settings?.agentMasterUrl || copyText('未配置', 'Not configured')],
             ['Agent Token', settings?.agentTokenConfigured ? copyText('已配置，不回显密钥', 'Configured, secret hidden') : copyText('未配置', 'Missing')],
-            [copyText('主控服务', 'Master Service'), settings?.masterServiceName || 'proxy-control'],
-            [copyText('被控服务', 'Agent Service'), settings?.agentServiceName || 'proxy-control-agent'],
+            [copyText('节点命名', 'Node Naming'), copyText('安装每台被控时单独填写', 'Set during each agent install')],
           ]}
         />
         <SettingCard
@@ -243,7 +236,7 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
         <div className="sub-panel-head">
           <div>
             <strong>{copyText('被控接入配置', 'Agent Access Config')}</strong>
-            <span>{copyText('配置 Agent 上线需要的总控地址和接入 Token；安装被控和 AI 批量安装会自动使用。', 'Configure the master URL and agent token used by one-click and AI batch installs.')}</span>
+            <span>{copyText('只配置 Agent 上线需要的总控地址和接入 Token；每台被控的节点名称在安装时单独填写。', 'Only configure the master URL and agent token; each node name is set during install.')}</span>
           </div>
         </div>
         <div className="admin-fields agent-fields">
@@ -255,17 +248,9 @@ export function SystemSettingsPanel({ copyText, installCommand, settings, onNoti
             <span>Agent Token</span>
             <input value={agentForm.agentToken} onChange={(event) => setAgentForm({ ...agentForm, agentToken: event.target.value })} type="password" autoComplete="off" placeholder={settings?.agentTokenConfigured ? copyText('留空保持原 Token', 'Leave blank to keep current token') : copyText('填写后保存', 'Enter token to save')} disabled={!loaded || agentSaving} />
           </label>
-          <label className="field">
-            <span>{copyText('主控服务名', 'Master Service')}</span>
-            <input value={agentForm.masterServiceName} onChange={(event) => setAgentForm({ ...agentForm, masterServiceName: event.target.value })} required placeholder="proxy-control" disabled={!loaded || agentSaving} />
-          </label>
-          <label className="field">
-            <span>{copyText('被控服务名', 'Agent Service')}</span>
-            <input value={agentForm.agentServiceName} onChange={(event) => setAgentForm({ ...agentForm, agentServiceName: event.target.value })} required placeholder="proxy-control-agent" disabled={!loaded || agentSaving} />
-          </label>
         </div>
         <div className="admin-form-footer">
-          <span>{agentError || copyText('Token 保存后不回显；留空只更新总控地址和服务名。', 'Token is hidden after saving; leave blank to only update URL and service names.')}</span>
+          <span>{agentError || copyText('Token 保存后不回显；节点名称在一键安装被控服务器时填写。', 'Token is hidden after saving; node names are entered during each agent install.')}</span>
           <button className="primary-button compact" type="submit" disabled={!loaded || agentSaving}><Save size={15} />{agentSaving ? copyText('保存中', 'Saving') : copyText('保存被控接入', 'Save Agent Access')}</button>
         </div>
       </form>
