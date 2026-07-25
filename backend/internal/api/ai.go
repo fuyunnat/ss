@@ -314,6 +314,7 @@ type installTarget struct {
 
 var hostTokenPattern = regexp.MustCompile(`^([A-Za-z0-9._-]+@)?([A-Za-z0-9.-]+\.[A-Za-z]{2,}|(?:\d{1,3}\.){3}\d{1,3})(?::(\d{1,5}))?$`)
 var regionTokenPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,5}$`)
+var nodeNameTokenPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$`)
 
 func parseInstallTargets(message string) []installTarget {
 	lines := strings.Split(strings.ReplaceAll(message, "\r\n", "\n"), "\n")
@@ -395,7 +396,7 @@ func nearbyName(tokens []string, hostIndex int, host string) string {
 		}
 		value := strings.Trim(strings.TrimSpace(tokens[index]), "，,;；。()[]{}")
 		upper := strings.ToUpper(value)
-		if value == "" || strings.Contains(value, "@") || hostTokenPattern.MatchString(value) || regionTokenPattern.MatchString(upper) {
+		if value == "" || strings.Contains(value, "@") || hostTokenPattern.MatchString(value) || regionTokenPattern.MatchString(upper) || !nodeNameTokenPattern.MatchString(value) {
 			continue
 		}
 		if len([]rune(value)) <= 32 {

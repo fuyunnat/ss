@@ -268,6 +268,33 @@ func TestAIChatDraftsBatchAgentInstalls(t *testing.T) {
 	}
 }
 
+func TestAIChatIgnoresCommandWordsAsNodeName(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	router, token := newTestRouter(t, st, "")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/ai/chat", strings.NewReader(`{"message":"帮我安装 root@203.0.113.10:22 HK hk-01"}`))
+	authorize(req, token)
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	var body aiChatResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Actions) != 1 {
+		t.Fatalf("expected 1 install action, got %#v", body.Actions)
+	}
+	if body.Actions[0].Payload["nodeName"] != "hk-01" {
+		t.Fatalf("unexpected node name: %#v", body.Actions[0])
+	}
+}
+
 func newTestRouter(t *testing.T, st *store.FileStore, agentToken string) (http.Handler, string) {
 	t.Helper()
 	router := NewRouter(st, Options{
